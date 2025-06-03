@@ -1,0 +1,44 @@
+{
+  "name": "task-management",
+  "version": "1.0.0",
+  "description": "Multi-threaded job queue system for NodeJS/BunJS",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "pnpm run clean && pnpm run build"
+  },
+  "keywords": [
+    "job-queue",
+    "multi-threaded",
+    "worker-threads",
+    "nodejs",
+    "bunjs",
+    "task-management"
+  ],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "packageManager": "pnpm@10.11.0",
+  "dependencies": {
+    "ulidx": "^2.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.29",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5",
+    "vitest": "^3.1.4"
+  }
+}

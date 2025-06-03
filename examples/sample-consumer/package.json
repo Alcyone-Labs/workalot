@@ -1,0 +1,29 @@
+{
+  "name": "task-management-sample-consumer",
+  "version": "1.0.0",
+  "description": "Sample consumer application demonstrating the task management library",
+  "type": "module",
+  "main": "app.ts",
+  "scripts": {
+    "start": "node ../../dist/examples/sample-consumer/app.js",
+    "dev": "tsx app.ts",
+    "build": "tsc",
+    "clean": "rm -rf data/*.json"
+  },
+  "keywords": [
+    "task-management",
+    "job-queue",
+    "worker-threads",
+    "example",
+    "demo"
+  ],
+  "author": "Task Management Library",
+  "license": "MIT",
+  "dependencies": {
+    "task-management": "file:../../"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0"
+  }
+}
