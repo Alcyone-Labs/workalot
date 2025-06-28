@@ -1,4 +1,4 @@
-import { BaseJob } from '../dist/jobs/BaseJob.js';
+import { BaseJob } from '../src/jobs/BaseJob.js';
 
 /**
  * Example job that performs mathematical operations

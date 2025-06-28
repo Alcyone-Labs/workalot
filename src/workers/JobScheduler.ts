@@ -1,19 +1,29 @@
-import { EventEmitter } from 'events';
-import { WorkerManager } from './WorkerManager.js';
-import { IQueueBackend } from '../queue/index.js';
-import { JobExecutor } from '../jobs/index.js';
-import { JobStatus, JobPayload, JobResult, QueueConfig } from '../types/index.js';
+import { EventEmitter } from "node:events";
+import { WorkerManager } from "./WorkerManager.js";
+import { IQueueBackend } from "../queue/index.js";
+import { JobExecutor } from "../jobs/index.js";
+import { JobRecoveryService } from "./JobRecoveryService.js";
+import {
+  JobStatus,
+  JobPayload,
+  JobResult,
+  QueueConfig,
+  BatchJobContext,
+  BatchExecutionResult,
+  JobSchedulingRequest,
+  BaseJobExecutionContext,
+} from "../types/index.js";
 
 /**
  * Events emitted by the JobScheduler
  */
 export interface JobSchedulerEvents {
-  'job-scheduled': (jobId: string) => void;
-  'job-started': (jobId: string, workerId: number) => void;
-  'job-completed': (jobId: string, result: JobResult) => void;
-  'job-failed': (jobId: string, error: string) => void;
-  'scheduler-idle': () => void;
-  'scheduler-busy': () => void;
+  "job-scheduled": (jobId: string) => void;
+  "job-started": (jobId: string, workerId: number) => void;
+  "job-completed": (jobId: string, result: JobResult) => void;
+  "job-failed": (jobId: string, error: string) => void;
+  "scheduler-idle": () => void;
+  "scheduler-busy": () => void;
 }
 
 /**
@@ -22,20 +32,37 @@ export interface JobSchedulerEvents {
 export class JobScheduler extends EventEmitter {
   private workerManager: WorkerManager;
   private jobExecutor: JobExecutor;
+  private jobRecoveryService: JobRecoveryService;
   private processingInterval?: NodeJS.Timeout;
   private isProcessing = false;
   private isShuttingDown = false;
+  private batchSize: number = 100; // Larger batch size for high performance
+  private useBatchProcessing: boolean = true; // Enable batch processing for better scaling
+  private lastProcessingTime = 0;
+  private readonly minProcessingInterval = 1; // Minimum 1ms between processing calls for higher throughput
 
   constructor(
     private queueBackend: IQueueBackend,
-    config: QueueConfig,
-    projectRoot: string = process.cwd()
+    private config: QueueConfig,
+    projectRoot: string = process.cwd(),
   ) {
     super();
-    
+
+    // Set max listeners to prevent warnings during high-throughput operations
+    // Allow for 2 listeners per job (completed + failed) plus some buffer
+    this.setMaxListeners(10000);
+
     this.workerManager = new WorkerManager(config, projectRoot);
     this.jobExecutor = new JobExecutor(projectRoot);
-    
+
+    // Initialize JobRecoveryService
+    this.jobRecoveryService = new JobRecoveryService(this.queueBackend, {
+      checkInterval: 60000, // Check every minute
+      stalledTimeout: 300000, // 5 minutes
+      enabled: config.jobRecoveryEnabled !== false, // Default to true unless explicitly disabled
+      maxRecoveryAttempts: 3,
+    });
+
     this.setupEventHandlers();
   }
 
@@ -44,16 +71,22 @@ export class JobScheduler extends EventEmitter {
    */
   async initialize(): Promise<void> {
     await this.workerManager.initialize();
+
+    // Start job recovery service if enabled
+    if (this.config.jobRecoveryEnabled !== false) {
+      this.jobRecoveryService.start();
+    }
+
     this.startProcessing();
-    console.log('Job scheduler initialized');
+    console.log("Job scheduler initialized");
   }
 
   /**
-   * Schedule a new job
+   * Schedule a new job without waiting for completion
    */
-  async scheduleJob(jobPayload: JobPayload): Promise<string> {
+  async schedule(jobPayload: JobPayload): Promise<string> {
     if (this.isShuttingDown) {
-      throw new Error('Scheduler is shutting down');
+      throw new Error("Scheduler is shutting down");
     }
 
     // Get job ID from the job itself
@@ -61,41 +94,51 @@ export class JobScheduler extends EventEmitter {
     try {
       jobId = await this.jobExecutor.getJobId(jobPayload);
     } catch (error) {
-      throw new Error(`Failed to get job ID: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to get job ID: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     // Add job to queue
     const finalJobId = await this.queueBackend.addJob(jobPayload, jobId);
-    this.emit('job-scheduled', finalJobId);
-    
+    this.emit("job-scheduled", finalJobId);
+
     // Trigger immediate processing if workers are available
     if (this.workerManager.hasAvailableWorkers()) {
-      setImmediate(() => this.processJobs());
+      setTimeout(() => this.processJobs(), 0);
     }
 
     return finalJobId;
   }
 
+
+
   /**
-   * Execute a job immediately and return a promise
+   * Schedule a job and wait for it to complete
    */
-  async executeJobNow(jobPayload: JobPayload): Promise<JobResult> {
+  async executeJobAndWait(jobPayload: JobPayload): Promise<JobResult> {
     if (this.isShuttingDown) {
-      throw new Error('Scheduler is shutting down');
+      throw new Error("Scheduler is shutting down");
     }
 
-    const jobId = await this.scheduleJob(jobPayload);
-    
+    const jobId = await this.schedule(jobPayload);
+
     return new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error(`Job ${jobId} timed out`));
-      }, (jobPayload.jobTimeout || 5000) + 1000); // Add 1 second buffer
+      const timeout = setTimeout(
+        () => {
+          // FIXED: Clean up event listeners on timeout to prevent memory leaks
+          this.off("job-completed", onCompleted);
+          this.off("job-failed", onFailed);
+          reject(new Error(`Job ${jobId} timed out`));
+        },
+        (jobPayload.jobTimeout || 5000) + 1000,
+      ); // Add 1 second buffer
 
       const onCompleted = (completedJobId: string, result: JobResult) => {
         if (completedJobId === jobId) {
           clearTimeout(timeout);
-          this.off('job-completed', onCompleted);
-          this.off('job-failed', onFailed);
+          this.off("job-completed", onCompleted);
+          this.off("job-failed", onFailed);
           resolve(result);
         }
       };
@@ -103,16 +146,18 @@ export class JobScheduler extends EventEmitter {
       const onFailed = (failedJobId: string, error: string) => {
         if (failedJobId === jobId) {
           clearTimeout(timeout);
-          this.off('job-completed', onCompleted);
-          this.off('job-failed', onFailed);
+          this.off("job-completed", onCompleted);
+          this.off("job-failed", onFailed);
           reject(new Error(error));
         }
       };
 
-      this.on('job-completed', onCompleted);
-      this.on('job-failed', onFailed);
+      this.on("job-completed", onCompleted);
+      this.on("job-failed", onFailed);
     });
   }
+
+
 
   /**
    * Get scheduler statistics
@@ -121,21 +166,62 @@ export class JobScheduler extends EventEmitter {
     queue: any;
     workers: any;
     isProcessing: boolean;
+    isShuttingDown: boolean;
+    batchProcessing: {
+      enabled: boolean;
+    };
+    jobRecovery: any;
   }> {
     return {
       queue: await this.queueBackend.getStats(),
       workers: this.workerManager.getWorkerStats(),
-      isProcessing: this.isProcessing
+      isProcessing: this.isProcessing,
+      isShuttingDown: this.isShuttingDown,
+      batchProcessing: {
+        enabled: this.useBatchProcessing,
+      },
+      jobRecovery: this.jobRecoveryService.getStats(),
     };
   }
 
   /**
-   * Check if scheduler is idle (no pending jobs and workers available)
+   * Check if scheduler is idle (no pending jobs, no processing jobs, and workers available)
    */
   async isIdle(): Promise<boolean> {
     const hasPending = await this.queueBackend.hasPendingJobs();
+    const hasProcessing = await this.queueBackend.hasProcessingJobs();
     const hasAvailableWorkers = this.workerManager.hasAvailableWorkers();
-    return !hasPending && hasAvailableWorkers;
+
+    return !hasPending && !hasProcessing && hasAvailableWorkers;
+  }
+
+  /**
+   * Configure batch processing settings
+   */
+  setBatchConfig(batchSize: number, enabled: boolean = true): void {
+    this.batchSize = Math.max(1, Math.min(100, batchSize)); // Clamp between 1-100
+    this.useBatchProcessing = enabled;
+    console.log(`Batch processing ${enabled ? 'enabled' : 'disabled'} with batch size: ${this.batchSize}`);
+  }
+
+  /**
+   * Get current batch configuration
+   */
+  getBatchConfig(): { batchSize: number; enabled: boolean } {
+    return {
+      batchSize: this.batchSize,
+      enabled: this.useBatchProcessing,
+    };
+  }
+
+
+
+  /**
+   * Manually trigger job recovery check
+   */
+  async recoverStalledJobs(): Promise<number> {
+    await this.jobRecoveryService.triggerCheck();
+    return 0; // The actual count is logged by the recovery service
   }
 
   /**
@@ -148,34 +234,79 @@ export class JobScheduler extends EventEmitter {
       clearInterval(this.processingInterval);
     }
 
+    // Stop job recovery service
+    this.jobRecoveryService.stop();
+
+    // Wait a brief moment for any in-flight job status updates to complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     await this.workerManager.shutdown();
-    console.log('Job scheduler shut down');
+
+    // Clean up all event listeners to prevent memory leaks
+    this.removeAllListeners();
+
+    console.log("Job scheduler shut down");
   }
 
   /**
    * Set up event handlers
    */
   private setupEventHandlers(): void {
-    this.workerManager.on('job-completed', (workerId, jobId, result) => {
+    this.workerManager.on("job-completed", (workerId, jobId, result) => {
       this.handleJobCompleted(jobId, result);
+      // Clear recovery attempts for completed jobs
+      this.jobRecoveryService.clearRecoveryAttempts(jobId);
+      // Immediately try to process more jobs when a worker becomes available
+      setTimeout(() => this.processJobs(), 0);
     });
 
-    this.workerManager.on('job-failed', (workerId, jobId, error) => {
+    this.workerManager.on("job-failed", (workerId, jobId, error) => {
       this.handleJobFailed(jobId, error);
+      // Clear recovery attempts for failed jobs
+      this.jobRecoveryService.clearRecoveryAttempts(jobId);
+      // Immediately try to process more jobs when a worker becomes available
+      setTimeout(() => this.processJobs(), 0);
     });
 
-    this.workerManager.on('all-workers-ready', () => {
-      console.log('All workers ready, starting job processing');
+    // Job recovery service event handlers
+    this.jobRecoveryService.on("jobs-recovered", ({ count, jobs }) => {
+      console.log(`Job recovery service recovered ${count} stalled jobs`);
+      // Trigger job processing after recovery
+      setTimeout(() => this.processJobs(), 100);
+    });
+
+    this.jobRecoveryService.on("jobs-failed", ({ count, jobs }) => {
+      console.log(`Job recovery service marked ${count} jobs as failed after max recovery attempts`);
+    });
+
+    this.jobRecoveryService.on("recovery-error", (error) => {
+      console.error("Job recovery service error:", error);
+    });
+
+    this.workerManager.on("batch-completed", (workerId, batchId, result) => {
+      this.handleBatchCompleted(result);
+      // Immediately try to process more jobs when a worker becomes available
+      setTimeout(() => this.processJobs(), 0);
+    });
+
+    this.workerManager.on("all-workers-ready", () => {
+      console.log("All workers ready, starting job processing");
+      // Start processing immediately when workers are ready
+      setTimeout(() => this.processJobs(), 0);
     });
   }
 
   /**
-   * Start periodic job processing
+   * Start event-driven job processing
    */
   private startProcessing(): void {
+    // Keep a minimal fallback timer for edge cases, but much less frequent
     this.processingInterval = setInterval(() => {
       this.processJobs();
-    }, 100); // Check every 100ms
+    }, 100); // Fallback check every 100ms for better responsiveness
+
+    // Start immediate processing
+    setTimeout(() => this.processJobs(), 0);
   }
 
   /**
@@ -186,86 +317,272 @@ export class JobScheduler extends EventEmitter {
       return;
     }
 
+    // Throttle processing calls to prevent event loop overload
+    const now = Date.now();
+    if (now - this.lastProcessingTime < this.minProcessingInterval) {
+      return;
+    }
+    this.lastProcessingTime = now;
+
     this.isProcessing = true;
 
     try {
-      while (this.workerManager.hasAvailableWorkers()) {
-        const nextJob = await this.queueBackend.getNextPendingJob();
-        if (!nextJob) {
-          break; // No more pending jobs
-        }
-
-        await this.executeJob(nextJob.id, nextJob.jobPayload);
+      if (this.useBatchProcessing) {
+        await this.processBatchJobs();
+      } else {
+        await this.processSingleJobs();
       }
 
       // Check if scheduler became idle
       if (await this.isIdle()) {
-        this.emit('scheduler-idle');
+        this.emit("scheduler-idle");
       } else {
-        this.emit('scheduler-busy');
+        this.emit("scheduler-busy");
       }
     } catch (error) {
-      console.error('Error processing jobs:', error);
+      console.error("Error processing jobs:", error);
     } finally {
       this.isProcessing = false;
     }
   }
 
   /**
-   * Execute a specific job
+   * Process jobs using worker-local queues for ultra-high throughput
    */
-  private async executeJob(jobId: string, jobPayload: JobPayload): Promise<void> {
-    try {
-      // Update job status to processing
-      await this.queueBackend.updateJobStatus(jobId, JobStatus.PROCESSING);
+  private async processBatchJobs(): Promise<void> {
+    // Get jobs to distribute to worker queues
+    const maxJobsToFetch = this.workerManager.getWorkerCount() * 200; // 200 jobs per worker queue for high throughput
 
-      // Get job from queue to calculate queue time
-      const queueItem = await this.queueBackend.getJob(jobId);
-      if (!queueItem) {
-        throw new Error(`Job ${jobId} not found in queue`);
+    if (!this.queueBackend.getNextPendingJobs) {
+      // Fallback to single job processing if batch method not available
+      await this.processSingleJobs();
+      return;
+    }
+
+    const pendingJobs = await this.queueBackend.getNextPendingJobs(maxJobsToFetch);
+    if (!pendingJobs || pendingJobs.length === 0) {
+      return; // No more pending jobs
+    }
+
+    // Prepare batch context for all jobs (but don't mark as PROCESSING yet)
+    const batchJobs: BatchJobContext[] = [];
+    for (const job of pendingJobs) {
+      const queueTime = Date.now() - job.requestedAt.getTime();
+      const context: BaseJobExecutionContext = {
+        jobId: job.id,
+        startTime: Date.now(),
+        queueTime,
+        timeout: job.jobPayload.jobTimeout || 10000,
+      };
+
+      batchJobs.push({
+        jobId: job.id,
+        jobPayload: job.jobPayload,
+        context,
+      });
+    }
+
+    // Distribute jobs to worker-local queues first
+    try {
+      await this.workerManager.distributeJobsToWorkers(batchJobs);
+
+      // Only mark as PROCESSING after successful distribution
+      for (const job of pendingJobs) {
+        await this.queueBackend.updateJobStatus(job.id, JobStatus.PROCESSING);
+        this.emit("job-started", job.id, -1); // Worker ID will be determined by WorkerManager
+      }
+    } catch (error) {
+      console.error(`Error distributing jobs to workers:`, error);
+      // Jobs remain in PENDING status since we didn't mark them as PROCESSING
+      // No need to handle job failures since they were never started
+    }
+  }
+
+  /**
+   * Process jobs one at a time (legacy mode)
+   */
+  private async processSingleJobs(): Promise<void> {
+    let jobsStarted = 0;
+    const maxJobsPerBatch = this.workerManager.getWorkerCount() * 10; // Start more jobs per batch
+
+    while (this.workerManager.hasAvailableWorkers() && jobsStarted < maxJobsPerBatch) {
+      const nextJob = await this.queueBackend.getNextPendingJob();
+      if (!nextJob) {
+        break; // No more pending jobs
       }
 
-      const queueTime = Date.now() - queueItem.requestedAt.getTime();
-      const context = {
+      try {
+        // Start job execution without awaiting (concurrent execution)
+        this.executeJob(nextJob.id, nextJob.jobPayload).catch(error => {
+          console.error(`Error executing job ${nextJob.id}:`, error);
+        });
+
+        jobsStarted++;
+      } catch (error) {
+        console.error(`Failed to start job ${nextJob.id}:`, error);
+        // Mark job as failed if we can't even start it
+        await this.handleJobFailed(
+          nextJob.id,
+          error instanceof Error ? error.message : String(error),
+        );
+        break; // Stop processing if we can't start jobs
+      }
+    }
+  }
+
+  /**
+   * Execute a specific job
+   */
+  private async executeJob(
+    jobId: string,
+    jobPayload: JobPayload,
+  ): Promise<void> {
+    try {
+      // Note: Job status is already updated to 'processing' by the queue backend's getNextPendingJob()
+      // Each backend handles atomic job claiming differently for optimal performance
+
+      // Use current time for queue time calculation (avoid extra DB query)
+      const queueTime = 0; // Simplified - could be calculated from job creation time if needed
+      const context: BaseJobExecutionContext = {
         jobId,
         startTime: Date.now(),
         queueTime,
-        timeout: jobPayload.jobTimeout || 5000
+        timeout: jobPayload.jobTimeout || 10000,
       };
 
-      this.emit('job-started', jobId, -1); // Worker ID will be determined by WorkerManager
+      this.emit("job-started", jobId, -1); // Worker ID will be determined by WorkerManager
 
-      // Execute job on worker
-      const result = await this.workerManager.executeJob(jobPayload, context);
-      
-      // This will be handled by the event handler
+      // Execute job on worker with additional error handling
+      try {
+        const result = await this.workerManager.executeJob(jobPayload, context);
+        // This will be handled by the event handler
+      } catch (workerError) {
+        // Handle specific worker errors
+        if (workerError instanceof Error && workerError.message === "No available workers") {
+          // Retry after a short delay if no workers are available
+          setTimeout(() => {
+            this.executeJob(jobId, jobPayload).catch(retryError => {
+              console.error(`Retry failed for job ${jobId}:`, retryError);
+            });
+          }, 100); // Retry after 100ms
+          return;
+        }
+        throw workerError;
+      }
     } catch (error) {
-      await this.handleJobFailed(jobId, error instanceof Error ? error.message : String(error));
+      await this.handleJobFailed(
+        jobId,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  }
+
+  /**
+   * Execute a batch of jobs
+   */
+  private async executeBatchJobs(batchJobs: BatchJobContext[]): Promise<void> {
+    try {
+      // Execute batch on worker
+      const result = await this.workerManager.executeBatchJobs(batchJobs);
+
+      // This will be handled by the batch event handler
+    } catch (error) {
+      // Handle batch failure
+      for (const batchJob of batchJobs) {
+        await this.handleJobFailed(
+          batchJob.jobId,
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+    }
+  }
+
+  /**
+   * Handle batch completion
+   */
+  private async handleBatchCompleted(result: BatchExecutionResult): Promise<void> {
+    // Process each job result in the batch
+    for (const jobResult of result.results) {
+      if (jobResult.success && jobResult.result) {
+        await this.handleJobCompleted(jobResult.jobId, jobResult.result);
+      } else {
+        await this.handleJobFailed(jobResult.jobId, jobResult.error || "Unknown batch job error");
+      }
     }
   }
 
   /**
    * Handle job completion
    */
-  private async handleJobCompleted(jobId: string, result: JobResult): Promise<void> {
+  private async handleJobCompleted(
+    jobId: string,
+    result: JobResult,
+  ): Promise<void> {
     try {
-      await this.queueBackend.updateJobStatus(jobId, JobStatus.COMPLETED, result);
-      this.emit('job-completed', jobId, result);
+      // Skip database operations if shutting down
+      if (!this.isShuttingDown) {
+        await this.queueBackend.updateJobStatus(
+          jobId,
+          JobStatus.COMPLETED,
+          result,
+        );
+
+        // Process any scheduling requests from the job
+        if (result.schedulingRequests && result.schedulingRequests.length > 0) {
+          await this.processSchedulingRequests(result.schedulingRequests);
+        }
+      }
+
+      this.emit("job-completed", jobId, result);
     } catch (error) {
-      console.error(`Failed to update completed job ${jobId}:`, error);
+      // Don't log errors during shutdown as they're expected
+      if (!this.isShuttingDown) {
+        console.error(`Failed to update completed job ${jobId}:`, error);
+      }
     }
   }
 
   /**
    * Handle job failure
    */
-  private async handleJobFailed(jobId: string, errorMessage: string): Promise<void> {
+  private async handleJobFailed(
+    jobId: string,
+    errorMessage: string,
+  ): Promise<void> {
     try {
-      const error = new Error(errorMessage);
-      await this.queueBackend.updateJobStatus(jobId, JobStatus.FAILED, undefined, error);
-      this.emit('job-failed', jobId, errorMessage);
+      // Skip database operations if shutting down
+      if (!this.isShuttingDown) {
+        const error = new Error(errorMessage);
+        await this.queueBackend.updateJobStatus(
+          jobId,
+          JobStatus.FAILED,
+          undefined,
+          error,
+        );
+      }
+      this.emit("job-failed", jobId, errorMessage);
     } catch (error) {
-      console.error(`Failed to update failed job ${jobId}:`, error);
+      // Don't log errors during shutdown as they're expected
+      if (!this.isShuttingDown) {
+        console.error(`Failed to update failed job ${jobId}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Process scheduling requests from completed jobs
+   */
+  private async processSchedulingRequests(requests: JobSchedulingRequest[]): Promise<void> {
+    for (const request of requests) {
+      try {
+        if (request.type === 'schedule' || request.type === 'scheduleAndWait') {
+          // Both types are fire-and-forget scheduling since the original job has already completed
+          // The requestId could be used for tracking if needed
+          await this.schedule(request.jobPayload);
+        }
+      } catch (error) {
+        console.error(`Failed to process scheduling request ${request.requestId}:`, error);
+      }
     }
   }
 }

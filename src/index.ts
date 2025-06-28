@@ -2,20 +2,22 @@
 export {
   // Main functions as described in documentation
   initializeTaskManager,
-  scheduleNow,
+  scheduleAndWait,
+  schedule,
   whenFree,
   removeWhenFreeCallback,
-  
+
   // Additional utility functions
-  scheduleJob,
   getStatus,
   isIdle,
+  whenIdle,
   getQueueStats,
   getWorkerStats,
+  getJobsByStatus,
   shutdown,
   getTaskManager,
   isInitialized,
-  
+
   // Classes for advanced usage
   TaskManager,
   TaskManagerSingleton,

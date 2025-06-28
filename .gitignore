@@ -2,3 +2,18 @@ node_modules
 .env*
 dist
 .idea/
+data/
+benchmarks/results/
+benchmark-results-*
+benchmarks/logs/
+queue-state.json
+*.db
+
+# Compilation artifacts in examples
+examples/**/*.js
+examples/**/*.d.ts
+examples/**/*.js.map
+examples/**/*.d.ts.map
+
+# Keep only essential docs (performance charts, etc.)
+# All documentation is consolidated in README.md

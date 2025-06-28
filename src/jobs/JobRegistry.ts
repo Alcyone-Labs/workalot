@@ -1,5 +1,5 @@
-import { readdir, stat } from 'fs/promises';
-import { resolve, join, extname } from 'path';
+import { readdir, stat } from 'node:fs/promises';
+import { resolve, join, extname } from 'node:path';
 import { JobLoader } from './JobLoader.js';
 
 /**

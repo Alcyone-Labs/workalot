@@ -5,10 +5,9 @@
   "type": "module",
   "main": "app.ts",
   "scripts": {
-    "start": "node ../../dist/examples/sample-consumer/app.js",
+    "start": "tsx app.ts",
     "dev": "tsx app.ts",
-    "build": "tsc",
-    "clean": "rm -rf data/*.json"
+    "clean": "rm -rf data/"
   },
   "keywords": [
     "task-management",

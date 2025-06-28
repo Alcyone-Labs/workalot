@@ -1,4 +1,4 @@
-import { BaseJob } from '../../../dist/jobs/BaseJob.js';
+import { BaseJob } from '../../../src/jobs/BaseJob.js';
 
 /**
  * Data Processing Job
@@ -18,7 +18,7 @@ export class DataProcessorJob extends BaseJob {
     const { operation, inputFile, outputFile } = payload;
 
     try {
-      console.log(`🔄 Processing data: ${operation} operation`);
+      console.log(`Processing data: ${operation} operation`);
 
       // Simulate processing time based on operation
       const processingTime = this.getProcessingTime(operation);
@@ -27,7 +27,7 @@ export class DataProcessorJob extends BaseJob {
       // Perform the operation
       const result = await this.performOperation(operation, inputFile, outputFile);
 
-      console.log(`✅ Data processing completed: ${operation}`);
+      console.log(`Data processing completed: ${operation}`);
 
       return this.createSuccessResult({
         operation,
@@ -40,7 +40,7 @@ export class DataProcessorJob extends BaseJob {
       });
 
     } catch (error) {
-      console.error(`❌ Data processing failed: ${operation}`, error);
+      console.error(`Data processing failed: ${operation}`, error);
       throw new Error(`Data processing failed for ${operation}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }

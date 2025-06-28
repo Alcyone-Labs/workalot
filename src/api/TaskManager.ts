@@ -1,11 +1,13 @@
-import { EventEmitter } from 'events';
-import { QueueManager } from '../queue/index.js';
+import { EventEmitter } from 'node:events';
+import { IQueueBackend } from '../queue/IQueueBackend.js';
+import { QueueFactory } from '../queue/QueueFactory.js';
 import { JobScheduler } from '../workers/index.js';
-import { 
-  JobPayload, 
-  JobResult, 
-  QueueConfig, 
-  WhenFreeCallback 
+import {
+  JobPayload,
+  JobResult,
+  QueueConfig,
+  WhenFreeCallback,
+  JobStatus
 } from '../types/index.js';
 
 /**
@@ -26,7 +28,7 @@ export interface TaskManagerEvents {
  * Main TaskManager class - the primary interface for the job queue system
  */
 export class TaskManager extends EventEmitter {
-  private queueManager: QueueManager;
+  private queueManager: IQueueBackend;
   private jobScheduler: JobScheduler;
   private whenFreeCallbacks: Set<WhenFreeCallback> = new Set();
   private isInitialized = false;
@@ -34,10 +36,11 @@ export class TaskManager extends EventEmitter {
 
   constructor(config: QueueConfig = {}, projectRoot: string = process.cwd()) {
     super();
-    
-    this.queueManager = new QueueManager(config);
+
+    // Use the queue factory to create the appropriate backend
+    this.queueManager = QueueFactory.createAutoQueue(config);
     this.jobScheduler = new JobScheduler(this.queueManager, config, projectRoot);
-    
+
     this.setupEventHandlers();
   }
 
@@ -64,10 +67,10 @@ export class TaskManager extends EventEmitter {
   }
 
   /**
-   * Schedule a job and return a promise that resolves when the job completes
+   * Schedule a job and wait for it to complete
    * This is the main API method as described in the documentation
    */
-  async scheduleNow(jobPayload: JobPayload): Promise<JobResult> {
+  async scheduleAndWait(jobPayload: JobPayload): Promise<JobResult> {
     this.ensureInitialized();
 
     if (this.isShuttingDown) {
@@ -75,12 +78,14 @@ export class TaskManager extends EventEmitter {
     }
 
     try {
-      const result = await this.jobScheduler.executeJobNow(jobPayload);
+      const result = await this.jobScheduler.executeJobAndWait(jobPayload);
       return result;
     } catch (error) {
       throw new Error(`Job execution failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
+
+
 
   /**
    * Register a callback to be called when the queue becomes free (no pending jobs)
@@ -156,17 +161,89 @@ export class TaskManager extends EventEmitter {
   }
 
   /**
+   * Wait for the task manager to become idle (no pending jobs and workers available)
+   * @param timeoutMs - Optional timeout in milliseconds (default: no timeout)
+   * @returns Promise that resolves when idle or rejects on timeout
+   */
+  async whenIdle(timeoutMs?: number): Promise<void> {
+    this.ensureInitialized();
+
+    return new Promise((resolve, reject) => {
+      let timeoutHandle: NodeJS.Timeout | undefined;
+
+      // Set up timeout if specified
+      if (timeoutMs && timeoutMs > 0) {
+        timeoutHandle = setTimeout(() => {
+          reject(new Error(`Timeout waiting for idle state after ${timeoutMs}ms`));
+        }, timeoutMs);
+      }
+
+      // Check if already idle
+      this.isIdle().then(idle => {
+        if (idle) {
+          if (timeoutHandle) clearTimeout(timeoutHandle);
+          resolve();
+          return;
+        }
+
+        // Set up callback to be called when idle
+        const callback = () => {
+          if (timeoutHandle) clearTimeout(timeoutHandle);
+          resolve();
+        };
+
+        this.whenFree(callback);
+      }).catch(error => {
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+        reject(error);
+      });
+    });
+  }
+
+  /**
+   * Get jobs by their status
+   * @param status - The job status to filter by
+   * @returns Promise that resolves to an array of jobs with the specified status
+   */
+  async getJobsByStatus(status: string): Promise<any[]> {
+    this.ensureInitialized();
+
+    // Convert string status to JobStatus enum
+    let jobStatus: JobStatus;
+    switch (status.toLowerCase()) {
+      case 'pending':
+        jobStatus = JobStatus.PENDING;
+        break;
+      case 'processing':
+        jobStatus = JobStatus.PROCESSING;
+        break;
+      case 'completed':
+        jobStatus = JobStatus.COMPLETED;
+        break;
+      case 'failed':
+        jobStatus = JobStatus.FAILED;
+        break;
+      default:
+        throw new Error(`Invalid job status: ${status}. Valid statuses are: pending, processing, completed, failed`);
+    }
+
+    return await this.queueManager.getJobsByStatus(jobStatus);
+  }
+
+  /**
    * Schedule a job without waiting for completion (fire and forget)
    */
-  async scheduleJob(jobPayload: JobPayload): Promise<string> {
+  async schedule(jobPayload: JobPayload): Promise<string> {
     this.ensureInitialized();
 
     if (this.isShuttingDown) {
       throw new Error('TaskManager is shutting down');
     }
 
-    return await this.jobScheduler.scheduleJob(jobPayload);
+    return await this.jobScheduler.schedule(jobPayload);
   }
+
+
 
   /**
    * Graceful shutdown of the task manager

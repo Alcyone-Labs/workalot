@@ -47,12 +47,14 @@ class TaskManagerSingleton {
   }
 
   /**
-   * Schedule a job and return a promise that resolves when the job completes
+   * Schedule a job and wait for it to complete
    */
-  async scheduleNow(jobPayload: JobPayload): Promise<JobResult> {
+  async scheduleAndWait(jobPayload: JobPayload): Promise<JobResult> {
     this.ensureInitialized();
-    return await this.taskManager!.scheduleNow(jobPayload);
+    return await this.taskManager!.scheduleAndWait(jobPayload);
   }
+
+
 
   /**
    * Register a callback to be called when the queue becomes free
@@ -73,10 +75,12 @@ class TaskManagerSingleton {
   /**
    * Schedule a job without waiting for completion
    */
-  async scheduleJob(jobPayload: JobPayload): Promise<string> {
+  async schedule(jobPayload: JobPayload): Promise<string> {
     this.ensureInitialized();
-    return await this.taskManager!.scheduleJob(jobPayload);
+    return await this.taskManager!.schedule(jobPayload);
   }
+
+
 
   /**
    * Get the current status
@@ -100,6 +104,22 @@ class TaskManagerSingleton {
   async getQueueStats(): Promise<any> {
     this.ensureInitialized();
     return await this.taskManager!.getQueueStats();
+  }
+
+  /**
+   * Wait for the task manager to become idle
+   */
+  async whenIdle(timeoutMs?: number): Promise<void> {
+    this.ensureInitialized();
+    return await this.taskManager!.whenIdle(timeoutMs);
+  }
+
+  /**
+   * Get jobs by their status
+   */
+  async getJobsByStatus(status: string): Promise<any[]> {
+    this.ensureInitialized();
+    return await this.taskManager!.getJobsByStatus(status);
   }
 
   /**

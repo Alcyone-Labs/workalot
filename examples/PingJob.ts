@@ -1,4 +1,4 @@
-import { BaseJob } from '../dist/jobs/BaseJob.js';
+import { BaseJob } from '../src/jobs/BaseJob.js';
 
 /**
  * Simple ping job for health checks and testing

@@ -1,4 +1,4 @@
-import { BaseJob } from '../../../dist/jobs/BaseJob.js';
+import { BaseJob } from '../../../src/jobs/BaseJob.js';
 
 /**
  * Report Generator Job
@@ -18,7 +18,7 @@ export class ReportGeneratorJob extends BaseJob {
     const { reportType, date, week, month, format = 'pdf' } = payload;
 
     try {
-      console.log(`📄 Generating report: ${reportType} in ${format} format`);
+      console.log(` Generating report: ${reportType} in ${format} format`);
 
       // Simulate report generation time based on type and format
       const generationTime = this.getGenerationTime(reportType, format);
@@ -27,7 +27,7 @@ export class ReportGeneratorJob extends BaseJob {
       // Generate the report
       const result = await this.generateReport(reportType, { date, week, month }, format);
 
-      console.log(`✅ Report generated: ${reportType} (${result.fileSize} bytes)`);
+      console.log(` Report generated: ${reportType} (${result.fileSize} bytes)`);
 
       return this.createSuccessResult({
         reportType,
@@ -43,7 +43,7 @@ export class ReportGeneratorJob extends BaseJob {
       });
 
     } catch (error) {
-      console.error(`❌ Report generation failed: ${reportType}`, error);
+      console.error(` Report generation failed: ${reportType}`, error);
       throw new Error(`Report generation failed for ${reportType}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
@@ -81,7 +81,7 @@ export class ReportGeneratorJob extends BaseJob {
     const stepTime = timeMs / steps.length;
 
     for (let i = 0; i < steps.length; i++) {
-      console.log(`   📊 ${steps[i]}...`);
+      console.log(`    ${steps[i]}...`);
       await new Promise(resolve => setTimeout(resolve, stepTime));
     }
   }

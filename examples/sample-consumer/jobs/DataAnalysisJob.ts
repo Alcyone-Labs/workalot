@@ -1,4 +1,4 @@
-import { BaseJob } from '../../../dist/jobs/BaseJob.js';
+import { BaseJob } from '../../../src/jobs/BaseJob.js';
 
 /**
  * Data Analysis Job
@@ -18,7 +18,7 @@ export class DataAnalysisJob extends BaseJob {
     const { dataset, analysisType, period } = payload;
 
     try {
-      console.log(`📊 Starting analysis: ${analysisType} on ${dataset}`);
+      console.log(`Starting analysis: ${analysisType} on ${dataset}`);
 
       // Simulate analysis time based on type
       const analysisTime = this.getAnalysisTime(analysisType);
@@ -27,7 +27,7 @@ export class DataAnalysisJob extends BaseJob {
       // Perform the analysis
       const result = await this.performAnalysis(dataset, analysisType, period);
 
-      console.log(`✅ Analysis completed: ${analysisType} on ${dataset}`);
+      console.log(`Analysis completed: ${analysisType} on ${dataset}`);
 
       return this.createSuccessResult({
         dataset,
@@ -42,7 +42,7 @@ export class DataAnalysisJob extends BaseJob {
       });
 
     } catch (error) {
-      console.error(`❌ Analysis failed: ${analysisType} on ${dataset}`, error);
+      console.error(` Analysis failed: ${analysisType} on ${dataset}`, error);
       throw new Error(`Analysis failed for ${analysisType}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
@@ -73,7 +73,7 @@ export class DataAnalysisJob extends BaseJob {
     const stepTime = timeMs / steps.length;
 
     for (let i = 0; i < steps.length; i++) {
-      console.log(`   📈 ${steps[i]}...`);
+      console.log(`   ${steps[i]}...`);
       await new Promise(resolve => setTimeout(resolve, stepTime));
     }
   }

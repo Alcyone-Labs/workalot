@@ -1,16 +1,36 @@
 {
-  "name": "task-management",
+  "name": "@alcyone-labs/workalot",
   "version": "1.0.0",
-  "description": "Multi-threaded job queue system for NodeJS/BunJS",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "description": "High-performance, multi-threaded job queue system for NodeJS/BunJS. Achieve high throughput jobs/sec with linear worker scaling.",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
   "type": "module",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp -r src/queue/migrations dist/src/queue/",
     "dev": "tsc --watch",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "benchmark": "pnpm run build && bun run benchmarks/run-benchmarks.ts",
+    "benchmark:easy": "pnpm run build && bun run benchmarks/run-benchmarks.ts --difficulty easy",
+    "benchmark:quick": "pnpm run build && bun run benchmarks/run-benchmarks.ts --configs 2-cores-10k-jobs,4-cores-10k-jobs",
+    "benchmark:quick:easy": "pnpm run build && bun run benchmarks/run-benchmarks.ts --configs 2-cores-10k-jobs,4-cores-10k-jobs --difficulty easy",
+    "benchmark:nodejs": "pnpm run build && node dist/benchmarks/run-benchmarks.js --difficulty easy",
+    "benchmark:nodejs:quick": "pnpm run build && node dist/benchmarks/run-benchmarks.js --configs 2-cores-10k-jobs,4-cores-10k-jobs --difficulty easy",
+    "benchmark:bun": "bun run benchmarks/run-benchmarks.ts --difficulty easy",
+    "benchmark:bun:quick": "bun run benchmarks/run-benchmarks.ts --configs 2-cores-10k-jobs,4-cores-10k-jobs --difficulty easy",
+    "benchmark:deno": "deno run --allow-all benchmarks/run-benchmarks.ts --difficulty easy",
+    "benchmark:deno:quick": "deno run --allow-all benchmarks/run-benchmarks.ts --configs 2-cores-10k-jobs,4-cores-10k-jobs --difficulty easy",
+    "benchmark:compare": "./benchmarks/compare-runtimes.sh easy 2-cores-10k-jobs,4-cores-10k-jobs",
+    "benchmark:compare:full": "./benchmarks/compare-runtimes.sh normal 2-cores-10k-jobs,4-cores-10k-jobs,6-cores-10k-jobs",
+    "benchmark:sqlite": "./benchmarks/run-sqlite-benchmarks.sh easy",
+    "benchmark:sqlite:normal": "./benchmarks/run-sqlite-benchmarks.sh normal",
+    "benchmark:backends": "./benchmarks/run-backend-comparison.sh easy 4 1k",
+    "benchmark:backends:10k": "./benchmarks/run-backend-comparison.sh easy 4 10k",
+    "example:quick-start": "pnpm run build && bun run examples/quick-start.ts",
+    "example:performance": "pnpm run build && bun run examples/performance-test.ts",
+    "example:errors": "pnpm run build && bun run examples/error-handling.ts",
+    "examples": "pnpm run example:quick-start",
     "clean": "rm -rf dist",
     "prepublishOnly": "pnpm run clean && pnpm run build"
   },
@@ -18,27 +38,46 @@
     "job-queue",
     "multi-threaded",
     "worker-threads",
-    "nodejs",
-    "bunjs",
-    "task-management"
+    "high-performance",
+    "task-management",
+    "scaling"
   ],
-  "author": "",
-  "license": "ISC",
+  "author": "Nicolas Embleton <nicolas.embleton@gmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/alcyone-labs/workalot#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alcyone-labs/workalot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/alcyone-labs/workalot/issues"
+  },
   "engines": {
     "node": ">=18.0.0"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
-  "packageManager": "pnpm@10.11.0",
   "dependencies": {
     "ulidx": "^2.4.1"
   },
+  "optionalDependencies": {
+    "@electric-sql/pglite": "^0.3.4",
+    "better-sqlite3": "^12.1.1"
+  },
   "devDependencies": {
-    "@types/node": "^22.15.29",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/cli-progress": "^3.11.6",
+    "@types/node": "^22.15.33",
+    "cli-progress": "^3.12.0",
     "typescript": "^5.8.3",
     "vite": "^6.3.5",
-    "vitest": "^3.1.4"
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.2.4"
   }
 }

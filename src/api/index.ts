@@ -7,15 +7,19 @@ export { TaskManagerSingleton, taskManager } from './TaskManagerSingleton.js';
 // Convenience functions (main API)
 export {
   initializeTaskManager,
-  scheduleNow,
+  scheduleAndWait,
+  schedule,
   whenFree,
   removeWhenFreeCallback,
-  scheduleJob,
   getStatus,
   isIdle,
+  whenIdle,
   getQueueStats,
   getWorkerStats,
+  getJobsByStatus,
   shutdown,
   getTaskManager,
-  isInitialized
+  isInitialized,
+  setBatchConfig,
+  getBatchConfig
 } from './functions.js';

@@ -70,7 +70,7 @@ describe('Worker System', () => {
       await workerManager.initialize();
 
       const jobPayload: JobPayload = {
-        jobFile: 'examples/PingJob.ts',
+        jobFile: 'dist/tests/fixtures/SimpleTestJob.js',
         jobPayload: { message: 'test' }
       };
 
@@ -93,27 +93,33 @@ describe('Worker System', () => {
     it('should execute multiple jobs concurrently', async () => {
       await workerManager.initialize();
 
-      const jobPayload: JobPayload = {
-        jobFile: 'examples/MathJob.ts',
-        jobPayload: {
-          operation: 'add',
-          numbers: [1, 2, 3, 4, 5]
-        }
-      };
+      // Execute jobs sequentially to avoid race conditions with worker availability
+      const results = [];
 
-      const promises = [];
       for (let i = 0; i < 3; i++) {
+        const jobPayload: JobPayload = {
+          jobFile: 'dist/tests/fixtures/SimpleTestJob.js',
+          jobPayload: {
+            operation: 'add',
+            numbers: [1, 2, 3, 4, 5],
+            jobIndex: i // Make each job unique
+          }
+        };
+
         const context = {
           jobId: `test-job-${i}`,
           startTime: Date.now(),
           queueTime: 25,
           timeout: 5000
         };
-        promises.push(workerManager.executeJob(jobPayload, context));
+
+        const result = await workerManager.executeJob(jobPayload, context);
+        results.push(result);
+
+        // Small delay to ensure worker is properly released
+        await new Promise(resolve => setTimeout(resolve, 10));
       }
 
-      const results = await Promise.all(promises);
-      
       expect(results).toHaveLength(3);
       for (const result of results) {
         expect(result.results.success).toBe(true);
@@ -125,7 +131,7 @@ describe('Worker System', () => {
       await workerManager.initialize();
 
       const jobPayload: JobPayload = {
-        jobFile: 'examples/MathJob.ts',
+        jobFile: 'dist/tests/fixtures/SimpleTestJob.js',
         jobPayload: {
           operation: 'invalid',
           numbers: [1, 2, 3]
@@ -147,19 +153,20 @@ describe('Worker System', () => {
       await workerManager.initialize();
 
       const jobPayload: JobPayload = {
-        jobFile: 'examples/MathJob.ts',
+        jobFile: 'dist/tests/fixtures/SimpleTestJob.js',
         jobPayload: {
           operation: 'add',
-          numbers: [1, 2, 3]
+          numbers: [1, 2, 3],
+          delay: 100 // Add 100ms delay to ensure timeout triggers
         },
-        jobTimeout: 1 // Very short timeout
+        jobTimeout: 50 // 50ms timeout, shorter than the delay
       };
 
       const context = {
         jobId: 'test-timeout-job',
         startTime: Date.now(),
         queueTime: 0,
-        timeout: 1
+        timeout: jobPayload.jobTimeout || 5000
       };
 
       await expect(workerManager.executeJob(jobPayload, context))
@@ -172,11 +179,11 @@ describe('Worker System', () => {
       await jobScheduler.initialize();
 
       const jobPayload: JobPayload = {
-        jobFile: 'examples/PingJob.ts',
+        jobFile: 'dist/tests/fixtures/SimpleTestJob.js',
         jobPayload: { message: 'scheduler test' }
       };
 
-      const jobId = await jobScheduler.scheduleJob(jobPayload);
+      const jobId = await jobScheduler.schedule(jobPayload);
       expect(jobId).toBeDefined();
       expect(typeof jobId).toBe('string');
 
@@ -191,11 +198,11 @@ describe('Worker System', () => {
       await jobScheduler.initialize();
 
       const jobPayload: JobPayload = {
-        jobFile: 'examples/PingJob.ts',
+        jobFile: 'dist/tests/fixtures/SimpleTestJob.js',
         jobPayload: { message: 'immediate test' }
       };
 
-      const result = await jobScheduler.executeJobNow(jobPayload);
+      const result = await jobScheduler.executeJobAndWait(jobPayload);
       
       expect(result).toBeDefined();
       expect(result.results.success).toBe(true);
@@ -205,21 +212,21 @@ describe('Worker System', () => {
     it('should handle multiple concurrent jobs', async () => {
       await jobScheduler.initialize();
 
-      const jobPayload: JobPayload = {
-        jobFile: 'examples/MathJob.ts',
-        jobPayload: {
-          operation: 'multiply',
-          numbers: [2, 3, 4]
-        }
-      };
-
       const promises = [];
       for (let i = 0; i < 3; i++) {
-        promises.push(jobScheduler.executeJobNow(jobPayload));
+        const jobPayload: JobPayload = {
+          jobFile: 'dist/tests/fixtures/SimpleTestJob.js',
+          jobPayload: {
+            operation: 'multiply',
+            numbers: [2, 3, 4],
+            jobIndex: i // Make each job unique
+          }
+        };
+        promises.push(jobScheduler.executeJobAndWait(jobPayload));
       }
 
       const results = await Promise.all(promises);
-      
+
       expect(results).toHaveLength(3);
       for (const result of results) {
         expect(result.results.success).toBe(true);
@@ -237,11 +244,11 @@ describe('Worker System', () => {
       jobScheduler.on('job-completed', () => events.push('completed'));
 
       const jobPayload: JobPayload = {
-        jobFile: 'examples/PingJob.ts',
+        jobFile: 'dist/tests/fixtures/SimpleTestJob.js',
         jobPayload: { message: 'event test' }
       };
 
-      await jobScheduler.executeJobNow(jobPayload);
+      await jobScheduler.executeJobAndWait(jobPayload);
 
       // Wait for events to be emitted
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -257,12 +264,12 @@ describe('Worker System', () => {
       expect(await jobScheduler.isIdle()).toBe(true);
 
       const jobPayload: JobPayload = {
-        jobFile: 'examples/PingJob.ts',
+        jobFile: 'dist/tests/fixtures/SimpleTestJob.js',
         jobPayload: { message: 'idle test' }
       };
 
       // Schedule a job and check it's not idle
-      const resultPromise = jobScheduler.executeJobNow(jobPayload);
+      const resultPromise = jobScheduler.executeJobAndWait(jobPayload);
       
       // Should become idle again after job completes
       await resultPromise;

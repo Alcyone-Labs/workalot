@@ -1,9 +1,6 @@
-import { createHash } from 'crypto';
-import { IJob } from '../types/index.js';
+import { ulid } from "ulidx";
+import { IJob, JobExecutionContext } from "../types/index.js";
 
-/**
- * Base job class that provides common functionality for all jobs
- */
 export abstract class BaseJob implements IJob {
   protected jobName: string;
 
@@ -11,55 +8,50 @@ export abstract class BaseJob implements IJob {
     this.jobName = jobName || this.constructor.name;
   }
 
-  /**
-   * Default implementation generates a SHA1 hash of job name + payload
-   * Override this method for custom ID generation
-   */
+  abstract run(
+    payload: Record<string, any>,
+    context: JobExecutionContext,
+  ): Promise<Record<string, any>>;
+
   getJobId(payload?: Record<string, any>): string | undefined {
     if (!payload) {
       return undefined;
     }
-
-    const content = this.jobName + JSON.stringify(payload);
-    return createHash('sha1').update(content).digest('hex');
+    // Generate monotonic, time-sortable ULID instead of SHA1 hash
+    // This prevents collisions for recurring jobs and is much more performant
+    return ulid();
   }
 
-  /**
-   * Abstract method that must be implemented by concrete job classes
-   */
-  abstract run(payload: Record<string, any>): Promise<Record<string, any>> | Record<string, any>;
-
-  /**
-   * Helper method to validate required payload fields
-   */
-  protected validatePayload(payload: Record<string, any>, requiredFields: string[]): void {
+  protected validatePayload(
+    payload: Record<string, any>,
+    requiredFields: string[],
+  ): void {
     for (const field of requiredFields) {
       if (!(field in payload)) {
-        throw new Error(`Missing required field: ${field}`);
+        throw new Error(`Missing required field in payload: ${field}`);
       }
     }
   }
 
-  /**
-   * Helper method to create a standardized error response
-   */
-  protected createErrorResult(message: string, details?: any): Record<string, any> {
+  protected createSuccessResult(
+    data: Record<string, any>,
+  ): Record<string, any> {
+    return {
+      success: true,
+      data,
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  protected createErrorResult(
+    message: string,
+    details?: Record<string, any>,
+  ): Record<string, any> {
     return {
       success: false,
       error: message,
       details,
-      timestamp: new Date().toISOString()
-    };
-  }
-
-  /**
-   * Helper method to create a standardized success response
-   */
-  protected createSuccessResult(data: any): Record<string, any> {
-    return {
-      success: true,
-      data,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
   }
 }

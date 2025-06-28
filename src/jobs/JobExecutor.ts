@@ -1,5 +1,6 @@
-import { JobLoader, JobLoadError, JobValidationError } from './JobLoader.js';
-import { JobPayload, JobResult } from '../types/index.js';
+import { JobLoader, JobLoadError, JobValidationError } from "./JobLoader.js";
+import { JobPayload, JobResult, JobExecutionContext, JobSchedulingRequest, BaseJobExecutionContext } from "../types/index.js";
+import { ulid } from "ulidx";
 
 /**
  * Error thrown when job execution times out
@@ -7,7 +8,7 @@ import { JobPayload, JobResult } from '../types/index.js';
 export class JobTimeoutError extends Error {
   constructor(timeout: number, jobFile: string) {
     super(`Job execution timed out after ${timeout}ms: ${jobFile}`);
-    this.name = 'JobTimeoutError';
+    this.name = "JobTimeoutError";
   }
 }
 
@@ -15,21 +16,17 @@ export class JobTimeoutError extends Error {
  * Error thrown when job execution fails
  */
 export class JobExecutionError extends Error {
-  constructor(message: string, public readonly jobFile: string, public readonly cause?: Error) {
+  constructor(
+    message: string,
+    public readonly jobFile: string,
+    public readonly cause?: Error,
+  ) {
     super(message);
-    this.name = 'JobExecutionError';
+    this.name = "JobExecutionError";
   }
 }
 
-/**
- * Execution context for a job
- */
-export interface JobExecutionContext {
-  jobId: string;
-  startTime: number;
-  queueTime: number;
-  timeout: number;
-}
+
 
 /**
  * Handles job execution with timeout and error handling
@@ -48,11 +45,15 @@ export class JobExecutor {
    */
   async executeJob(
     jobPayload: JobPayload,
-    context: JobExecutionContext
+    context: BaseJobExecutionContext,
   ): Promise<JobResult> {
+
     const { jobFile, jobPayload: payload, jobTimeout } = jobPayload;
     const timeout = jobTimeout || this.defaultTimeout;
     const startTime = Date.now();
+
+    // Create enhanced context with scheduling capabilities
+    const enhancedContext = this.createEnhancedContext(context);
 
     try {
       // Create a promise that rejects after timeout
@@ -63,17 +64,18 @@ export class JobExecutor {
       });
 
       // Execute the job with timeout
-      const executionPromise = this.jobLoader.executeJob(jobPayload);
-      
+      const executionPromise = this.jobLoader.executeJob(jobPayload, enhancedContext);
+
       const result = await Promise.race([executionPromise, timeoutPromise]);
       const executionTime = Date.now() - startTime;
 
       return {
         results: result,
         executionTime,
-        queueTime: context.queueTime
+        queueTime: context.queueTime,
+        // Include any scheduling requests made by the job
+        schedulingRequests: enhancedContext._schedulingRequests,
       };
-
     } catch (error) {
       const executionTime = Date.now() - startTime;
 
@@ -82,11 +84,14 @@ export class JobExecutor {
         throw error;
       }
 
-      if (error instanceof JobLoadError || error instanceof JobValidationError) {
+      if (
+        error instanceof JobLoadError ||
+        error instanceof JobValidationError
+      ) {
         throw new JobExecutionError(
           `Job loading failed: ${error.message}`,
           jobFile.toString(),
-          error
+          error,
         );
       }
 
@@ -94,9 +99,45 @@ export class JobExecutor {
       throw new JobExecutionError(
         `Job execution failed: ${error instanceof Error ? error.message : String(error)}`,
         jobFile.toString(),
-        error as Error
+        error as Error,
       );
     }
+  }
+
+  /**
+   * Create enhanced context with scheduling capabilities
+   */
+  private createEnhancedContext(baseContext: BaseJobExecutionContext): JobExecutionContext {
+    const schedulingRequests: JobSchedulingRequest[] = [];
+
+    return {
+      ...baseContext,
+      _schedulingRequests: schedulingRequests,
+
+      // scheduleAndWait - accumulates request and returns promise that resolves to request ID
+      scheduleAndWait: async (jobPayload: JobPayload): Promise<string> => {
+        const requestId = ulid();
+        schedulingRequests.push({
+          type: 'scheduleAndWait',
+          jobPayload,
+          requestId,
+        });
+        return requestId;
+      },
+
+      // schedule - accumulates request and returns request ID immediately
+      schedule: (jobPayload: JobPayload): string => {
+        const requestId = ulid();
+        schedulingRequests.push({
+          type: 'schedule',
+          jobPayload,
+          requestId,
+        });
+        return requestId;
+      },
+
+
+    };
   }
 
   /**
@@ -106,11 +147,14 @@ export class JobExecutor {
     try {
       return await this.jobLoader.getJobId(jobPayload);
     } catch (error) {
-      if (error instanceof JobLoadError || error instanceof JobValidationError) {
+      if (
+        error instanceof JobLoadError ||
+        error instanceof JobValidationError
+      ) {
         throw new JobExecutionError(
           `Failed to get job ID: ${error.message}`,
           jobPayload.jobFile.toString(),
-          error
+          error,
         );
       }
       throw error;

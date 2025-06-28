@@ -12,9 +12,12 @@ export {
 export {
   JobExecutor,
   JobTimeoutError,
-  JobExecutionError,
-  type JobExecutionContext
+  JobExecutionError
 } from './JobExecutor.js';
+
+export {
+  type JobExecutionContext
+} from '../types/index.js';
 
 // Job registry and discovery
 export {

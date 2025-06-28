@@ -1,4 +1,4 @@
-import { writeFile, readFile, access, constants } from 'fs/promises';
+import { writeFile, readFile, access, constants } from 'node:fs/promises';
 import { ulid } from 'ulidx';
 import {
   QueueItem,
@@ -26,6 +26,7 @@ export interface QueueManagerEvents {
  */
 export class QueueManager extends IQueueBackend {
   private queue = new Map<string, QueueItem>();
+  private pendingQueue: QueueItem[] = []; // Fast O(1) pending job access
   private cleanupInterval?: NodeJS.Timeout;
   private persistenceTimeout?: NodeJS.Timeout;
   private isShuttingDown = false;
@@ -68,6 +69,7 @@ export class QueueManager extends IQueueBackend {
     };
 
     this.queue.set(id, queueItem);
+    this.pendingQueue.push(queueItem); // Add to fast pending queue
     this.emit('item-added', queueItem);
 
     // Check if queue was empty before
@@ -134,15 +136,62 @@ export class QueueManager extends IQueueBackend {
   }
 
   /**
-   * Gets the next pending job
+   * Gets the next pending job with atomic claiming
    */
   async getNextPendingJob(): Promise<QueueItem | undefined> {
-    for (const item of this.queue.values()) {
-      if (item.status === JobStatus.PENDING) {
-        return item;
+    // Fast O(1) access to pending jobs
+    while (this.pendingQueue.length > 0) {
+      const item = this.pendingQueue.shift(); // Atomic pop from front
+
+      if (!item) {
+        break;
+      }
+
+      // Double-check the item is still pending (race condition protection)
+      const currentItem = this.queue.get(item.id);
+      if (currentItem && currentItem.status === JobStatus.PENDING) {
+        // Atomically update to processing status (like other backends)
+        currentItem.status = JobStatus.PROCESSING;
+        currentItem.startedAt = new Date();
+        currentItem.lastUpdated = new Date();
+
+        return currentItem;
+      }
+      // If item was already processed, continue to next
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Gets multiple pending jobs for batch processing
+   */
+  async getNextPendingJobs(count: number): Promise<QueueItem[]> {
+    const jobs: QueueItem[] = [];
+
+    for (let i = 0; i < count && this.pendingQueue.length > 0; i++) {
+      const item = this.pendingQueue.shift();
+
+      if (!item) {
+        break;
+      }
+
+      // Double-check the item is still pending
+      const currentItem = this.queue.get(item.id);
+      if (currentItem && currentItem.status === JobStatus.PENDING) {
+        // Atomically update to processing status (like other backends)
+        currentItem.status = JobStatus.PROCESSING;
+        currentItem.startedAt = new Date();
+        currentItem.lastUpdated = new Date();
+
+        jobs.push(currentItem);
+      } else {
+        // If item was already processed, don't count it against our limit
+        i--;
       }
     }
-    return undefined;
+
+    return jobs;
   }
 
   /**
@@ -150,6 +199,13 @@ export class QueueManager extends IQueueBackend {
    */
   async getJobsByStatus(status: JobStatus): Promise<QueueItem[]> {
     return Array.from(this.queue.values()).filter(item => item.status === status);
+  }
+
+  /**
+   * Get job by ID
+   */
+  async getJobById(jobId: string): Promise<QueueItem | undefined> {
+    return this.queue.get(jobId);
   }
 
   /**
@@ -224,8 +280,21 @@ export class QueueManager extends IQueueBackend {
    * Checks if queue has any pending jobs
    */
   async hasPendingJobs(): Promise<boolean> {
-    const pendingJobs = await this.getJobsByStatus(JobStatus.PENDING);
-    return pendingJobs.length > 0;
+    // Use the fast pending queue for O(1) check
+    return this.pendingQueue.length > 0;
+  }
+
+  /**
+   * Checks if queue has any processing jobs
+   */
+  async hasProcessingJobs(): Promise<boolean> {
+    // Efficient O(n) scan but only checks status, no data transfer
+    for (const item of this.queue.values()) {
+      if (item.status === JobStatus.PROCESSING) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -253,6 +322,12 @@ export class QueueManager extends IQueueBackend {
         if (item.completedAt) item.completedAt = new Date(item.completedAt);
 
         this.queue.set(item.id, item);
+
+        // Add pending jobs to fast pending queue
+        if (item.status === JobStatus.PENDING) {
+          this.pendingQueue.push(item);
+        }
+
         loadedCount++;
       }
 
@@ -279,6 +354,52 @@ export class QueueManager extends IQueueBackend {
       console.error(`Failed to save queue state: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
     }
+  }
+
+  /**
+   * Recover stalled jobs that have been processing for too long
+   */
+  async recoverStalledJobs(stalledTimeoutMs: number = 300000): Promise<number> {
+    const stalledJobs = await this.getStalledJobs(stalledTimeoutMs);
+    let recoveredCount = 0;
+
+    for (const job of stalledJobs) {
+      // Reset job to pending status
+      job.status = JobStatus.PENDING;
+      job.startedAt = undefined;
+      job.lastUpdated = new Date();
+
+      // Add back to pending queue
+      this.pendingQueue.push(job);
+      recoveredCount++;
+    }
+
+    if (recoveredCount > 0) {
+      this.schedulePersistence();
+      console.log(`Recovered ${recoveredCount} stalled jobs`);
+    }
+
+    return recoveredCount;
+  }
+
+  /**
+   * Get jobs that have been processing for longer than the specified timeout
+   */
+  async getStalledJobs(stalledTimeoutMs: number = 300000): Promise<QueueItem[]> {
+    const cutoffTime = Date.now() - stalledTimeoutMs;
+    const stalledJobs: QueueItem[] = [];
+
+    for (const item of this.queue.values()) {
+      if (
+        item.status === JobStatus.PROCESSING &&
+        item.startedAt &&
+        item.startedAt.getTime() < cutoffTime
+      ) {
+        stalledJobs.push(item);
+      }
+    }
+
+    return stalledJobs;
   }
 
   /**
@@ -315,8 +436,10 @@ export class QueueManager extends IQueueBackend {
    * Sets up graceful shutdown handlers
    */
   private setupGracefulShutdown(): void {
-    // Only set up handlers if not in test environment
-    if (process.env.NODE_ENV !== 'test' && process.env.VITEST !== 'true') {
+    // Only set up handlers if not in test environment or benchmark environment
+    if (process.env.NODE_ENV !== 'test' &&
+        process.env.VITEST !== 'true' &&
+        !process.env.WORKALOT_BENCHMARK) {
       const shutdownHandler = async () => {
         console.log('Shutting down queue manager...');
         await this.shutdown();

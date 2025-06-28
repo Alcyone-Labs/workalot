@@ -1,4 +1,4 @@
-import { BaseJob } from '../../../dist/jobs/BaseJob.js';
+import { BaseJob } from '../../../src/jobs/BaseJob.js';
 
 /**
  * Notification Job
@@ -18,7 +18,7 @@ export class NotificationJob extends BaseJob {
     const { type, recipients, subject, message, template, channel, url, priority = 'normal' } = payload;
 
     try {
-      console.log(`📧 Sending ${type} notification${recipients ? ` to ${recipients.length} recipients` : ''}`);
+      console.log(` Sending ${type} notification${recipients ? ` to ${recipients.length} recipients` : ''}`);
 
       // Simulate notification sending time based on type
       const sendTime = this.getSendTime(type, recipients?.length || 1);
@@ -36,7 +36,7 @@ export class NotificationJob extends BaseJob {
         payload: payload.payload
       });
 
-      console.log(`✅ ${type} notification sent successfully`);
+      console.log(` ${type} notification sent successfully`);
 
       return this.createSuccessResult({
         type,
@@ -52,7 +52,7 @@ export class NotificationJob extends BaseJob {
       });
 
     } catch (error) {
-      console.error(`❌ ${type} notification failed:`, error);
+      console.error(` ${type} notification failed:`, error);
       throw new Error(`Notification failed for ${type}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
@@ -86,7 +86,7 @@ export class NotificationJob extends BaseJob {
     const stepTime = timeMs / steps.length;
 
     for (let i = 0; i < steps.length; i++) {
-      console.log(`   📤 ${steps[i]}...`);
+      console.log(`    ${steps[i]}...`);
       await new Promise(resolve => setTimeout(resolve, stepTime));
     }
   }

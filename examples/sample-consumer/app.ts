@@ -1,21 +1,24 @@
 #!/usr/bin/env node
 
-import { 
-  initializeTaskManager, 
-  scheduleNow, 
-  whenFree, 
+import {
+  initializeTaskManager,
+  scheduleAndWait,
+  whenFree,
   shutdown,
   getStatus,
   getQueueStats,
   getWorkerStats,
   isIdle
 } from '../../src/index.js';
-import { readFile, writeFile } from 'fs/promises';
-import { resolve } from 'path';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 /**
  * Sample Consumer Application
- * 
+ *
  * This application demonstrates a real-world usage of the task management library
  * for processing data files, generating reports, and sending notifications.
  */
@@ -25,18 +28,20 @@ class SampleConsumerApp {
   private startTime = Date.now();
 
   async start() {
-    console.log('🚀 Starting Sample Consumer Application...');
-    
+    console.log('Starting Sample Consumer Application...');
+
     try {
       // Initialize task manager with custom configuration
+      // Use in-memory PGLite for examples to avoid file system issues
       await initializeTaskManager({
+        backend: 'pglite',
+        databaseUrl: 'memory://',
         maxThreads: 6,
         maxInMemoryAge: 10 * 60 * 1000, // 10 minutes
-        persistenceFile: resolve(__dirname, 'data/queue-state.json'),
         healthCheckInterval: 3000
-      });
+      }, resolve(__dirname, '../..'));
 
-      console.log('✅ Task Manager initialized');
+      console.log('Task Manager initialized');
       this.isRunning = true;
 
       // Set up monitoring
@@ -49,7 +54,7 @@ class SampleConsumerApp {
       await this.processWorkload();
 
     } catch (error) {
-      console.error('❌ Application failed to start:', error);
+      console.error('Application failed to start:', error);
       process.exit(1);
     }
   }
@@ -67,43 +72,41 @@ class SampleConsumerApp {
         const queueStats = await getQueueStats();
         const workerStats = await getWorkerStats();
 
-        console.log('\n📊 System Status:');
+        console.log('\nSystem Status:');
         console.log(`   Queue: ${queueStats.pending} pending, ${queueStats.processing} processing, ${queueStats.completed} completed`);
         console.log(`   Workers: ${workerStats.available}/${workerStats.total} available`);
         console.log(`   Processed: ${this.processedCount} jobs`);
         console.log(`   Runtime: ${Math.round((Date.now() - this.startTime) / 1000)}s`);
       } catch (error) {
-        console.error('❌ Monitoring error:', error);
+        console.error('Monitoring error:', error);
       }
     }, 5000);
   }
 
   private setupCompletionHandler() {
-    whenFree(() => {
-      console.log('\n🎉 All jobs completed! Queue is now free.');
-      this.showFinalStats();
-    });
+    // Don't set up the completion handler immediately
+    // We'll check for completion after all jobs are scheduled
   }
 
   private async processWorkload() {
-    console.log('\n📝 Processing sample workload...');
+    console.log('\nProcessing sample workload...');
 
     // Simulate different types of jobs
     const jobs = [
       // Data processing jobs
       ...this.createDataProcessingJobs(),
-      
+
       // Report generation jobs
       ...this.createReportJobs(),
-      
+
       // Notification jobs
       ...this.createNotificationJobs(),
-      
+
       // Cleanup jobs
       ...this.createCleanupJobs()
     ];
 
-    console.log(`\n🔄 Scheduling ${jobs.length} jobs...`);
+    console.log(`\nScheduling ${jobs.length} jobs...`);
 
     // Process jobs in batches to demonstrate different patterns
     await this.processBatch('Data Processing', jobs.slice(0, 5));
@@ -111,36 +114,43 @@ class SampleConsumerApp {
     await this.processBatch('Notifications', jobs.slice(8, 12));
     await this.processBatch('Cleanup', jobs.slice(12));
 
-    console.log('\n✅ All jobs scheduled successfully');
+    console.log('\nAll jobs scheduled successfully');
+
+    // Now set up completion handler and wait for all jobs to finish
+    whenFree(() => {
+      console.log('\nAll jobs completed! Queue is now free.');
+      this.showFinalStats();
+    });
   }
 
   private async processBatch(batchName: string, jobs: any[]) {
-    console.log(`\n📦 Processing batch: ${batchName} (${jobs.length} jobs)`);
+    console.log(`\nProcessing batch: ${batchName} (${jobs.length} jobs)`);
 
     const promises = jobs.map(async (job, index) => {
       try {
-        const result = await scheduleNow(job);
+        const result = await scheduleAndWait(job);
         this.processedCount++;
-        console.log(`   ✅ ${batchName} job ${index + 1} completed in ${result.executionTime}ms`);
+        console.log(`   ${batchName} job ${index + 1} completed in ${result.executionTime}ms`);
         return result;
       } catch (error) {
-        console.error(`   ❌ ${batchName} job ${index + 1} failed:`, error.message);
+        console.error(`   ${batchName} job ${index + 1} failed:`, error instanceof Error ? error.message : String(error));
         throw error;
       }
     });
 
     try {
       await Promise.all(promises);
-      console.log(`   🎯 ${batchName} batch completed successfully`);
+      console.log(`   ${batchName} batch completed successfully`);
     } catch (error) {
-      console.error(`   ⚠️  ${batchName} batch had failures`);
+      console.error(`   ${batchName} batch had failures`);
     }
   }
 
   private createDataProcessingJobs() {
+    const projectRoot = resolve(__dirname, '../..');
     return [
       {
-        jobFile: 'examples/sample-consumer/jobs/DataProcessorJob.ts',
+        jobFile: resolve(projectRoot, 'examples/sample-consumer/jobs/DataProcessorJob.ts'),
         jobPayload: {
           inputFile: 'data/sample1.json',
           operation: 'transform',
@@ -149,7 +159,7 @@ class SampleConsumerApp {
         jobTimeout: 10000
       },
       {
-        jobFile: 'examples/sample-consumer/jobs/DataProcessorJob.ts',
+        jobFile: resolve(projectRoot, 'examples/sample-consumer/jobs/DataProcessorJob.ts'),
         jobPayload: {
           inputFile: 'data/sample2.json',
           operation: 'validate',
@@ -158,7 +168,7 @@ class SampleConsumerApp {
         jobTimeout: 8000
       },
       {
-        jobFile: 'examples/sample-consumer/jobs/DataProcessorJob.ts',
+        jobFile: resolve(projectRoot, 'examples/sample-consumer/jobs/DataProcessorJob.ts'),
         jobPayload: {
           inputFile: 'data/sample3.json',
           operation: 'aggregate',
@@ -167,7 +177,7 @@ class SampleConsumerApp {
         jobTimeout: 12000
       },
       {
-        jobFile: 'examples/sample-consumer/jobs/DataAnalysisJob.ts',
+        jobFile: resolve(projectRoot, 'examples/sample-consumer/jobs/DataAnalysisJob.ts'),
         jobPayload: {
           dataset: 'sales_data',
           analysisType: 'trend',
@@ -176,7 +186,7 @@ class SampleConsumerApp {
         jobTimeout: 15000
       },
       {
-        jobFile: 'examples/sample-consumer/jobs/DataAnalysisJob.ts',
+        jobFile: resolve(projectRoot, 'examples/sample-consumer/jobs/DataAnalysisJob.ts'),
         jobPayload: {
           dataset: 'user_behavior',
           analysisType: 'pattern',
@@ -188,9 +198,10 @@ class SampleConsumerApp {
   }
 
   private createReportJobs() {
+    const projectRoot = resolve(__dirname, '../..');
     return [
       {
-        jobFile: 'examples/sample-consumer/jobs/ReportGeneratorJob.ts',
+        jobFile: resolve(projectRoot, 'examples/sample-consumer/jobs/ReportGeneratorJob.ts'),
         jobPayload: {
           reportType: 'daily_summary',
           date: '2024-01-15',
@@ -199,7 +210,7 @@ class SampleConsumerApp {
         jobTimeout: 25000
       },
       {
-        jobFile: 'examples/sample-consumer/jobs/ReportGeneratorJob.ts',
+        jobFile: resolve(projectRoot, 'examples/sample-consumer/jobs/ReportGeneratorJob.ts'),
         jobPayload: {
           reportType: 'weekly_analytics',
           week: '2024-W03',
@@ -208,7 +219,7 @@ class SampleConsumerApp {
         jobTimeout: 30000
       },
       {
-        jobFile: 'examples/sample-consumer/jobs/ReportGeneratorJob.ts',
+        jobFile: resolve(projectRoot, 'examples/sample-consumer/jobs/ReportGeneratorJob.ts'),
         jobPayload: {
           reportType: 'monthly_dashboard',
           month: '2024-01',
@@ -220,9 +231,10 @@ class SampleConsumerApp {
   }
 
   private createNotificationJobs() {
+    const projectRoot = resolve(__dirname, '../..');
     return [
       {
-        jobFile: 'examples/sample-consumer/jobs/NotificationJob.ts',
+        jobFile: resolve(projectRoot, 'examples/sample-consumer/jobs/NotificationJob.ts'),
         jobPayload: {
           type: 'email',
           recipients: ['admin@example.com'],
@@ -232,7 +244,7 @@ class SampleConsumerApp {
         jobTimeout: 5000
       },
       {
-        jobFile: 'examples/sample-consumer/jobs/NotificationJob.ts',
+        jobFile: resolve(projectRoot, 'examples/sample-consumer/jobs/NotificationJob.ts'),
         jobPayload: {
           type: 'slack',
           channel: '#analytics',
@@ -242,7 +254,7 @@ class SampleConsumerApp {
         jobTimeout: 3000
       },
       {
-        jobFile: 'examples/sample-consumer/jobs/NotificationJob.ts',
+        jobFile: resolve(projectRoot, 'examples/sample-consumer/jobs/NotificationJob.ts'),
         jobPayload: {
           type: 'webhook',
           url: 'https://api.example.com/notifications',
@@ -251,7 +263,7 @@ class SampleConsumerApp {
         jobTimeout: 8000
       },
       {
-        jobFile: 'examples/sample-consumer/jobs/NotificationJob.ts',
+        jobFile: resolve(projectRoot, 'examples/sample-consumer/jobs/NotificationJob.ts'),
         jobPayload: {
           type: 'sms',
           recipients: ['+1234567890'],
@@ -263,9 +275,10 @@ class SampleConsumerApp {
   }
 
   private createCleanupJobs() {
+    const projectRoot = resolve(__dirname, '../..');
     return [
       {
-        jobFile: 'examples/sample-consumer/jobs/CleanupJob.ts',
+        jobFile: resolve(projectRoot, 'examples/sample-consumer/jobs/CleanupJob.ts'),
         jobPayload: {
           operation: 'archive_old_files',
           directory: 'data/temp',
@@ -274,7 +287,7 @@ class SampleConsumerApp {
         jobTimeout: 10000
       },
       {
-        jobFile: 'examples/sample-consumer/jobs/CleanupJob.ts',
+        jobFile: resolve(projectRoot, 'examples/sample-consumer/jobs/CleanupJob.ts'),
         jobPayload: {
           operation: 'clear_cache',
           cacheType: 'redis',
@@ -291,7 +304,7 @@ class SampleConsumerApp {
       const workerStats = await getWorkerStats();
       const totalTime = Math.round((Date.now() - this.startTime) / 1000);
 
-      console.log('\n📈 Final Statistics:');
+      console.log('\nFinal Statistics:');
       console.log(`   Total Jobs Processed: ${this.processedCount}`);
       console.log(`   Successful: ${finalStats.completed}`);
       console.log(`   Failed: ${finalStats.failed}`);
@@ -305,21 +318,21 @@ class SampleConsumerApp {
       }, 2000);
 
     } catch (error) {
-      console.error('❌ Error showing final stats:', error);
+      console.error('Error showing final stats:', error);
       await this.stop();
     }
   }
 
   async stop() {
-    console.log('\n🛑 Shutting down application...');
+    console.log('\nShutting down application...');
     this.isRunning = false;
 
     try {
       await shutdown();
-      console.log('✅ Application shut down successfully');
+      console.log('Application shut down successfully');
       process.exit(0);
     } catch (error) {
-      console.error('❌ Error during shutdown:', error);
+      console.error('Error during shutdown:', error);
       process.exit(1);
     }
   }
@@ -327,23 +340,23 @@ class SampleConsumerApp {
 
 // Handle graceful shutdown
 process.on('SIGINT', async () => {
-  console.log('\n🛑 Received SIGINT, shutting down gracefully...');
+  console.log('\nReceived SIGINT, shutting down gracefully...');
   try {
     await shutdown();
     process.exit(0);
   } catch (error) {
-    console.error('❌ Error during shutdown:', error);
+    console.error('Error during shutdown:', error);
     process.exit(1);
   }
 });
 
 process.on('SIGTERM', async () => {
-  console.log('\n🛑 Received SIGTERM, shutting down gracefully...');
+  console.log('\nReceived SIGTERM, shutting down gracefully...');
   try {
     await shutdown();
     process.exit(0);
   } catch (error) {
-    console.error('❌ Error during shutdown:', error);
+    console.error('Error during shutdown:', error);
     process.exit(1);
   }
 });
