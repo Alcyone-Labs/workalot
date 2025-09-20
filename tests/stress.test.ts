@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { TaskManager } from "../src/api/TaskManager.js";
-import { JobPayload } from "../src/types/index.js";
+import { TaskManager } from "../src/api/TaskManager.ts";
+import { JobPayload } from "../src/types/index.ts";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -15,7 +15,7 @@ describe("Stress Test", () => {
   beforeAll(async () => {
     taskManager = new TaskManager({
       maxThreads: 4,
-      persistenceFile: `stress-test-queue-${Date.now()}.json`,
+      persistenceFile: `stress-test-queue-${Date.now()}.tson`,
     }, projectRoot);
     await taskManager.initialize();
   });
@@ -32,19 +32,19 @@ describe("Stress Test", () => {
       if (i % 10 === 0) {
         // 10% failing jobs
         jobs.push({
-          jobFile: "dist/tests/fixtures/FailingJob.js",
+          jobFile: "./tests/fixtures/FailingJob.ts",
           jobPayload: { index: i },
         });
       } else if (i % 5 === 0) {
         // 20% long-running jobs
         jobs.push({
-          jobFile: "dist/tests/fixtures/LongRunningJob.js",
+          jobFile: "./tests/fixtures/LongRunningJob.ts",
           jobPayload: { index: i, duration: 100 + Math.random() * 50 },
         });
       } else {
         // 70% simple jobs
         jobs.push({
-          jobFile: "dist/tests/fixtures/SimpleTestJob.js",
+          jobFile: "./tests/fixtures/SimpleTestJob.ts",
           jobPayload: { index: i, operation: "add", values: [i, i + 1] },
         });
       }
@@ -65,10 +65,10 @@ describe("Stress Test", () => {
     const failedJobs = await taskManager.getJobsByStatus("failed");
 
     const expectedFulfilled = jobs.filter(
-      (j) => j.jobFile !== "dist/tests/fixtures/FailingJob.js",
+      (j) => j.jobFile !== "./tests/fixtures/FailingJob.ts",
     ).length;
     const expectedRejected = jobs.filter(
-      (j) => j.jobFile === "dist/tests/fixtures/FailingJob.js",
+      (j) => j.jobFile === "./tests/fixtures/FailingJob.ts",
     ).length;
 
     expect(completedJobs.length).toBe(expectedFulfilled);

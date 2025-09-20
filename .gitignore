@@ -8,6 +8,8 @@ benchmark-results-*
 benchmarks/logs/
 queue-state.json
 *.db
+test-recovery-*
+test-queue-state-*
 
 # Compilation artifacts in examples
 examples/**/*.js

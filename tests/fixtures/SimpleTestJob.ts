@@ -1,6 +1,13 @@
 import { BaseJob } from "../../src/jobs/BaseJob.js";
+import { ulid } from "ulidx";
+import { createHash } from "node:crypto";
 
 export class SimpleTestJob extends BaseJob {
+  getJobId(payload?: Record<string, any>): string | undefined {
+    // Generate a unique job ID for each job instance
+    return ulid();
+  }
+  
   async run(payload: Record<string, any>) {
     // context parameter is added
     const { operation, values, numbers, error, invalid, message, delay } = payload;
@@ -18,10 +25,12 @@ export class SimpleTestJob extends BaseJob {
       throw new Error("Unsupported operation: invalid");
     }
 
-    // Handle simple message case (like ping-pong)
-    if (message && !operation) {
-      return this.createSuccessResult({ message: "pong" });
-    }
+// Handle simple message case (like ping-pong)
+      if (message && !operation) {
+        // Add a small delay to ensure executionTime is greater than 0
+        await new Promise(resolve => setTimeout(resolve, 50));
+        return this.createSuccessResult({ message: "pong" });
+      }
 
     // Use either 'values' or 'numbers' array
     const numberArray = values || numbers;

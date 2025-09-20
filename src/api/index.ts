@@ -19,7 +19,5 @@ export {
   getJobsByStatus,
   shutdown,
   getTaskManager,
-  isInitialized,
-  setBatchConfig,
-  getBatchConfig
+  isInitialized
 } from './functions.js';

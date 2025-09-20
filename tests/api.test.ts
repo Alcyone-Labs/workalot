@@ -12,14 +12,14 @@ import {
   isIdle,
   shutdown,
   isInitialized,
-} from "../src/api/index.js";
-import { JobPayload } from "../src/types/index.js";
+} from "../src/api/index.ts";
+import { JobPayload } from "../src/types/index.ts";
 
 describe("API Layer", () => {
   let testPersistenceFile: string;
 
   beforeEach(async () => {
-    testPersistenceFile = `test-api-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.json`;
+    testPersistenceFile = `test-api-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.tson`;
 
     // Reset singleton for clean tests
     TaskManagerSingleton.reset();
@@ -67,7 +67,7 @@ describe("API Layer", () => {
 
     it("should execute jobs with scheduleAndWait", async () => {
       const jobPayload: JobPayload = {
-        jobFile: "dist/tests/fixtures/SimpleTestJob.js",
+        jobFile: "./tests/fixtures/SimpleTestJob.ts",
         jobPayload: { message: "test" },
       };
 
@@ -86,7 +86,7 @@ describe("API Layer", () => {
       const promises = [];
       for (let i = 1; i <= 3; i++) {
         const promise = taskManager.scheduleAndWait({
-          jobFile: "dist/tests/fixtures/TimedJob.js",
+          jobFile: "./tests/fixtures/TimedJob.ts",
           jobPayload: {
             jobId: `Job-${i}`,
             duration: 100,
@@ -115,7 +115,7 @@ describe("API Layer", () => {
     it("should handle scheduleAndWait timeout correctly", async () => {
       // Test that timeout properly cleans up event listeners
       const timeoutPromise = taskManager.scheduleAndWait({
-        jobFile: "dist/tests/fixtures/TimeoutJob.js",
+        jobFile: "./tests/fixtures/TimeoutJob.ts",
         jobPayload: { delay: 2000 }, // 2 second delay
         jobTimeout: 500 // 0.5 second timeout
       });
@@ -124,7 +124,7 @@ describe("API Layer", () => {
 
       // Verify system is still functional after timeout
       const result = await taskManager.scheduleAndWait({
-        jobFile: "dist/tests/fixtures/SimpleTestJob.js",
+        jobFile: "./tests/fixtures/SimpleTestJob.ts",
         jobPayload: { message: "after timeout" },
       });
 
@@ -137,7 +137,7 @@ describe("API Layer", () => {
 
       // Call scheduleAndWait - should schedule job and wait for completion
       const scheduleAndWaitResult = await taskManager.scheduleAndWait({
-        jobFile: "dist/tests/fixtures/TimedJob.js",
+        jobFile: "./tests/fixtures/TimedJob.ts",
         jobPayload: {
           jobId: 'ScheduleAndWait-Job',
           duration: 50,
@@ -176,7 +176,7 @@ describe("API Layer", () => {
       });
 
       const jobPayload: JobPayload = {
-        jobFile: "dist/tests/fixtures/SimpleTestJob.js",
+        jobFile: "./tests/fixtures/SimpleTestJob.ts",
         jobPayload: { message: "test" },
       };
 
@@ -208,7 +208,7 @@ describe("API Layer", () => {
 
     it("should schedule jobs without waiting", async () => {
       const jobPayload: JobPayload = {
-        jobFile: "dist/tests/fixtures/SimpleTestJob.js",
+        jobFile: "./tests/fixtures/SimpleTestJob.ts",
         jobPayload: { message: "fire and forget" },
       };
 
@@ -270,7 +270,7 @@ describe("API Layer", () => {
       });
 
       const jobPayload: JobPayload = {
-        jobFile: "dist/tests/fixtures/SimpleTestJob.js",
+        jobFile: "./tests/fixtures/SimpleTestJob.ts",
         jobPayload: { message: "singleton test" },
       };
 
@@ -305,7 +305,7 @@ describe("API Layer", () => {
       });
 
       const jobPayload: JobPayload = {
-        jobFile: "dist/tests/fixtures/SimpleTestJob.js",
+        jobFile: "./tests/fixtures/SimpleTestJob.ts",
         jobPayload: { message: "function test" },
       };
 
@@ -379,7 +379,7 @@ describe("API Layer", () => {
 
       await expect(
         scheduleAndWait({
-          jobFile: "dist/tests/fixtures/SimpleTestJob.js",
+          jobFile: "./tests/fixtures/SimpleTestJob.ts",
           jobPayload: {},
         }),
       ).rejects.toThrow("TaskManager must be initialized");

@@ -151,11 +151,14 @@ export class QueueManager extends IQueueBackend {
       const currentItem = this.queue.get(item.id);
       if (currentItem && currentItem.status === JobStatus.PENDING) {
         // Atomically update to processing status (like other backends)
-        currentItem.status = JobStatus.PROCESSING;
-        currentItem.startedAt = new Date();
-        currentItem.lastUpdated = new Date();
-
-        return currentItem;
+        await this.updateJobStatus(item.id, JobStatus.PROCESSING);
+        const updatedItem = this.queue.get(item.id);
+        if (updatedItem) {
+          updatedItem.status = JobStatus.PROCESSING;
+          updatedItem.startedAt = new Date();
+          updatedItem.lastUpdated = new Date();
+          return updatedItem;
+        }
       }
       // If item was already processed, continue to next
     }
@@ -180,11 +183,14 @@ export class QueueManager extends IQueueBackend {
       const currentItem = this.queue.get(item.id);
       if (currentItem && currentItem.status === JobStatus.PENDING) {
         // Atomically update to processing status (like other backends)
-        currentItem.status = JobStatus.PROCESSING;
-        currentItem.startedAt = new Date();
-        currentItem.lastUpdated = new Date();
-
-        jobs.push(currentItem);
+        await this.updateJobStatus(item.id, JobStatus.PROCESSING);
+        const updatedItem = this.queue.get(item.id);
+        if (updatedItem) {
+          updatedItem.status = JobStatus.PROCESSING;
+          updatedItem.startedAt = new Date();
+          updatedItem.lastUpdated = new Date();
+          jobs.push(updatedItem);
+        }
       } else {
         // If item was already processed, don't count it against our limit
         i--;

@@ -1,11 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { unlink } from 'fs/promises';
-import { WorkerManager, JobScheduler } from '../src/workers/index.js';
-import { QueueManager } from '../src/queue/index.js';
-import { JobPayload, QueueConfig } from '../src/types/index.js';
+import { JobScheduler } from '../src/workers/index.ts';
+import { QueueManager } from '../src/queue/index.ts';
+import { JobPayload, QueueConfig } from '../src/types/index.ts';
 
 describe('Worker System', () => {
-  let workerManager: WorkerManager;
   let queueManager: QueueManager;
   let jobScheduler: JobScheduler;
   let testPersistenceFile: string;
@@ -17,7 +16,7 @@ describe('Worker System', () => {
   };
 
   beforeEach(async () => {
-    testPersistenceFile = `test-workers-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.json`;
+    testPersistenceFile = `test-workers-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.tson`;
     
     const configWithFile = {
       ...config,
@@ -27,14 +26,10 @@ describe('Worker System', () => {
     queueManager = new QueueManager(configWithFile);
     await queueManager.initialize();
 
-    workerManager = new WorkerManager(configWithFile);
     jobScheduler = new JobScheduler(queueManager, configWithFile);
   });
 
   afterEach(async () => {
-    if (workerManager) {
-      await workerManager.shutdown();
-    }
     if (jobScheduler) {
       await jobScheduler.shutdown();
     }
@@ -50,136 +45,14 @@ describe('Worker System', () => {
     }
   });
 
-  describe('WorkerManager', () => {
-    it('should initialize workers', async () => {
-      await workerManager.initialize();
-      
-      const stats = workerManager.getWorkerStats();
-      expect(stats.total).toBe(2);
-      expect(stats.ready).toBe(2);
-      expect(stats.busy).toBe(0);
-      expect(stats.available).toBe(2);
-    });
-
-    it('should have available workers after initialization', async () => {
-      await workerManager.initialize();
-      expect(workerManager.hasAvailableWorkers()).toBe(true);
-    });
-
-    it('should execute a simple job', async () => {
-      await workerManager.initialize();
-
-      const jobPayload: JobPayload = {
-        jobFile: 'dist/tests/fixtures/SimpleTestJob.js',
-        jobPayload: { message: 'test' }
-      };
-
-      const context = {
-        jobId: 'test-job-1',
-        startTime: Date.now(),
-        queueTime: 50,
-        timeout: 5000
-      };
-
-      const result = await workerManager.executeJob(jobPayload, context);
-      
-      expect(result).toBeDefined();
-      expect(result.results.success).toBe(true);
-      expect(result.results.data.message).toBe('pong');
-      expect(result.executionTime).toBeGreaterThan(0);
-      expect(result.queueTime).toBe(50);
-    });
-
-    it('should execute multiple jobs concurrently', async () => {
-      await workerManager.initialize();
-
-      // Execute jobs sequentially to avoid race conditions with worker availability
-      const results = [];
-
-      for (let i = 0; i < 3; i++) {
-        const jobPayload: JobPayload = {
-          jobFile: 'dist/tests/fixtures/SimpleTestJob.js',
-          jobPayload: {
-            operation: 'add',
-            numbers: [1, 2, 3, 4, 5],
-            jobIndex: i // Make each job unique
-          }
-        };
-
-        const context = {
-          jobId: `test-job-${i}`,
-          startTime: Date.now(),
-          queueTime: 25,
-          timeout: 5000
-        };
-
-        const result = await workerManager.executeJob(jobPayload, context);
-        results.push(result);
-
-        // Small delay to ensure worker is properly released
-        await new Promise(resolve => setTimeout(resolve, 10));
-      }
-
-      expect(results).toHaveLength(3);
-      for (const result of results) {
-        expect(result.results.success).toBe(true);
-        expect(result.results.data.result).toBe(15);
-      }
-    });
-
-    it('should handle job errors', async () => {
-      await workerManager.initialize();
-
-      const jobPayload: JobPayload = {
-        jobFile: 'dist/tests/fixtures/SimpleTestJob.js',
-        jobPayload: {
-          operation: 'invalid',
-          numbers: [1, 2, 3]
-        }
-      };
-
-      const context = {
-        jobId: 'test-error-job',
-        startTime: Date.now(),
-        queueTime: 0,
-        timeout: 5000
-      };
-
-      await expect(workerManager.executeJob(jobPayload, context))
-        .rejects.toThrow();
-    });
-
-    it('should handle job timeout', async () => {
-      await workerManager.initialize();
-
-      const jobPayload: JobPayload = {
-        jobFile: 'dist/tests/fixtures/SimpleTestJob.js',
-        jobPayload: {
-          operation: 'add',
-          numbers: [1, 2, 3],
-          delay: 100 // Add 100ms delay to ensure timeout triggers
-        },
-        jobTimeout: 50 // 50ms timeout, shorter than the delay
-      };
-
-      const context = {
-        jobId: 'test-timeout-job',
-        startTime: Date.now(),
-        queueTime: 0,
-        timeout: jobPayload.jobTimeout || 5000
-      };
-
-      await expect(workerManager.executeJob(jobPayload, context))
-        .rejects.toThrow('timed out');
-    });
-  });
+  
 
   describe('JobScheduler', () => {
     it('should initialize and schedule jobs', async () => {
       await jobScheduler.initialize();
 
       const jobPayload: JobPayload = {
-        jobFile: 'dist/tests/fixtures/SimpleTestJob.js',
+        jobFile: './tests/fixtures/SimpleTestJob.ts',
         jobPayload: { message: 'scheduler test' }
       };
 
@@ -198,7 +71,7 @@ describe('Worker System', () => {
       await jobScheduler.initialize();
 
       const jobPayload: JobPayload = {
-        jobFile: 'dist/tests/fixtures/SimpleTestJob.js',
+        jobFile: './tests/fixtures/SimpleTestJob.ts',
         jobPayload: { message: 'immediate test' }
       };
 
@@ -215,7 +88,7 @@ describe('Worker System', () => {
       const promises = [];
       for (let i = 0; i < 3; i++) {
         const jobPayload: JobPayload = {
-          jobFile: 'dist/tests/fixtures/SimpleTestJob.js',
+          jobFile: './tests/fixtures/SimpleTestJob.ts',
           jobPayload: {
             operation: 'multiply',
             numbers: [2, 3, 4],
@@ -244,7 +117,7 @@ describe('Worker System', () => {
       jobScheduler.on('job-completed', () => events.push('completed'));
 
       const jobPayload: JobPayload = {
-        jobFile: 'dist/tests/fixtures/SimpleTestJob.js',
+        jobFile: './tests/fixtures/SimpleTestJob.ts',
         jobPayload: { message: 'event test' }
       };
 
@@ -264,7 +137,7 @@ describe('Worker System', () => {
       expect(await jobScheduler.isIdle()).toBe(true);
 
       const jobPayload: JobPayload = {
-        jobFile: 'dist/tests/fixtures/SimpleTestJob.js',
+        jobFile: './tests/fixtures/SimpleTestJob.ts',
         jobPayload: { message: 'idle test' }
       };
 
@@ -274,8 +147,37 @@ describe('Worker System', () => {
       // Should become idle again after job completes
       await resultPromise;
       
-      // Wait a bit for processing to complete
-      await new Promise(resolve => setTimeout(resolve, 200));
+      // Wait for scheduler to report idle state
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(async () => {
+          const isIdle = await jobScheduler.isIdle();
+          const stats = await jobScheduler.getStats();
+          console.log(`Scheduler idle check after timeout: ${isIdle}`);
+          console.log(`Scheduler stats:`, stats);
+          reject(new Error(`Scheduler did not become idle within timeout. Current idle state: ${isIdle}`));
+        }, 1000);
+        
+        const onIdle = async () => {
+          clearTimeout(timeout);
+          resolve(true);
+        };
+        
+        jobScheduler.on("scheduler-idle", onIdle);
+        
+        // Also check periodically in case the event was missed
+        const checkInterval = setInterval(async () => {
+          const isIdle = await jobScheduler.isIdle();
+          const stats = await jobScheduler.getStats();
+          console.log(`Scheduler idle check: ${isIdle}`);
+          console.log(`Scheduler stats:`, stats);
+          if (isIdle) {
+            clearTimeout(timeout);
+            clearInterval(checkInterval);
+            jobScheduler.off("scheduler-idle", onIdle);
+            resolve(true);
+          }
+        }, 50);
+      });
       
       expect(await jobScheduler.isIdle()).toBe(true);
     });

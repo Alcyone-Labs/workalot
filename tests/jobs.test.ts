@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { JobLoader } from "../src/jobs/JobLoader.js";
-import { JobExecutor } from "../src/jobs/JobExecutor.js";
+import { JobLoader } from "../src/jobs/JobLoader.ts";
+import { JobExecutor } from "../src/jobs/JobExecutor.ts";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -19,7 +19,7 @@ describe("Job System", () => {
 
     it("should load a valid job file", async () => {
       const job = await jobLoader.loadJob(
-        "dist/tests/fixtures/SimpleTestJob.js",
+        "./tests/fixtures/SimpleTestJob.ts",
       );
       expect(job).toBeDefined();
       expect(typeof job.run).toBe("function");
@@ -28,16 +28,16 @@ describe("Job System", () => {
 
     it("should cache loaded jobs", async () => {
       const job1 = await jobLoader.loadJob(
-        "dist/tests/fixtures/SimpleTestJob.js",
+        "./tests/fixtures/SimpleTestJob.ts",
       );
       const job2 = await jobLoader.loadJob(
-        "dist/tests/fixtures/SimpleTestJob.js",
+        "./tests/fixtures/SimpleTestJob.ts",
       );
       expect(job1).toBe(job2);
     });
 
     it("should throw JobLoadError for non-existent file", async () => {
-      await expect(jobLoader.loadJob("nonexistent.js")).rejects.toThrow(
+      await expect(jobLoader.loadJob("nonexistent.ts")).rejects.toThrow(
         /Job file not found or not readable/,
       );
     });
@@ -45,7 +45,7 @@ describe("Job System", () => {
     it("should get job ID from loaded job", async () => {
       const payload = { test: "data" };
       const jobId = await jobLoader.getJobId({
-        jobFile: "dist/tests/fixtures/SimpleTestJob.js",
+        jobFile: "./tests/fixtures/SimpleTestJob.ts",
         jobPayload: payload,
       });
       // Should return a ULID (26 characters, alphanumeric)
@@ -62,10 +62,13 @@ describe("Job System", () => {
         startTime: Date.now(),
         queueTime: 0,
         timeout: 5000,
+        scheduleAndWait: async () => Promise.resolve(""),
+        schedule: () => "",
+        _schedulingRequests: []
       };
       const result = await jobLoader.executeJob(
         {
-          jobFile: "dist/examples/PingJob.js",
+          jobFile: "./examples/PingJob.ts",
           jobPayload: payload,
         },
         context,
@@ -85,7 +88,7 @@ describe("Job System", () => {
 
     it("should execute job with timing information", async () => {
       const jobPayload = {
-        jobFile: "dist/tests/fixtures/LongRunningJob.js",
+        jobFile: "./tests/fixtures/LongRunningJob.ts",
         jobPayload: { duration: 100 },
       };
       const context = {
@@ -93,6 +96,9 @@ describe("Job System", () => {
         startTime: Date.now(),
         queueTime: 0,
         timeout: 5000,
+        scheduleAndWait: async () => Promise.resolve(""),
+        schedule: () => "",
+        _schedulingRequests: []
       };
       const result = await jobExecutor.executeJob(jobPayload, context);
 
@@ -103,7 +109,7 @@ describe("Job System", () => {
 
     it("should execute math job with complex payload", async () => {
       const jobPayload = {
-        jobFile: "dist/tests/fixtures/SimpleTestJob.js",
+        jobFile: "./tests/fixtures/SimpleTestJob.ts",
         jobPayload: { operation: "add", values: [1, 2, 3, 4, 5] },
       };
       const context = {
@@ -111,6 +117,9 @@ describe("Job System", () => {
         startTime: Date.now(),
         queueTime: 0,
         timeout: 5000,
+        scheduleAndWait: async () => Promise.resolve(""),
+        schedule: () => "",
+        _schedulingRequests: []
       };
       const result = await jobExecutor.executeJob(jobPayload, context);
 
@@ -120,7 +129,7 @@ describe("Job System", () => {
 
     it("should handle job timeout", async () => {
       const jobPayload = {
-        jobFile: "dist/tests/fixtures/LongRunningJob.js",
+        jobFile: "./tests/fixtures/LongRunningJob.ts",
         jobPayload: { duration: 200 },
         jobTimeout: 100,
       };
@@ -129,6 +138,9 @@ describe("Job System", () => {
         startTime: Date.now(),
         queueTime: 0,
         timeout: 100,
+        scheduleAndWait: async () => Promise.resolve(""),
+        schedule: () => "",
+        _schedulingRequests: []
       };
       await expect(jobExecutor.executeJob(jobPayload, context)).rejects.toThrow(
         /Job execution timed out/,

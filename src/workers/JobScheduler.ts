@@ -1,5 +1,7 @@
 import { EventEmitter } from "node:events";
 import { WorkerManager } from "./WorkerManager.js";
+import { WorkerManagerConfig } from "./WorkerManager.js";
+import { QueueOrchestrator } from "./QueueOrchestrator.js";
 import { IQueueBackend } from "../queue/index.js";
 import { JobExecutor } from "../jobs/index.js";
 import { JobRecoveryService } from "./JobRecoveryService.js";
@@ -41,10 +43,11 @@ export class JobScheduler extends EventEmitter {
   private lastProcessingTime = 0;
   private readonly minProcessingInterval = 1; // Minimum 1ms between processing calls for higher throughput
 
-  constructor(
+constructor(
     private queueBackend: IQueueBackend,
     private config: QueueConfig,
     projectRoot: string = process.cwd(),
+    workerManager?: WorkerManager,
   ) {
     super();
 
@@ -52,7 +55,27 @@ export class JobScheduler extends EventEmitter {
     // Allow for 2 listeners per job (completed + failed) plus some buffer
     this.setMaxListeners(10000);
 
-    this.workerManager = new WorkerManager(config, projectRoot);
+    if (workerManager) {
+      this.workerManager = workerManager;
+    } else {
+      // Create a queue orchestrator for the worker manager
+      const workerManagerConfig: WorkerManagerConfig = {
+        numWorkers: config.maxThreads,
+        projectRoot: projectRoot,
+        silent: config.silent,
+      };
+
+      // Create a queue orchestrator for the worker manager
+      const queueOrchestrator = new QueueOrchestrator({
+        workerQueueSize: 50,
+        queueThreshold: 10,
+        ackTimeout: 5000,
+        enableWorkerQueues: true,
+      });
+
+      this.workerManager = new WorkerManager(queueOrchestrator, workerManagerConfig);
+    }
+    
     this.jobExecutor = new JobExecutor(projectRoot);
 
     // Initialize JobRecoveryService
@@ -252,20 +275,26 @@ export class JobScheduler extends EventEmitter {
    * Set up event handlers
    */
   private setupEventHandlers(): void {
-    this.workerManager.on("job-completed", (workerId, jobId, result) => {
+    this.workerManager.on("job-completed", (jobId: string, result: JobResult) => {
+      console.log(`[JobScheduler] Received job-completed event for ${jobId}`);
       this.handleJobCompleted(jobId, result);
       // Clear recovery attempts for completed jobs
       this.jobRecoveryService.clearRecoveryAttempts(jobId);
       // Immediately try to process more jobs when a worker becomes available
-      setTimeout(() => this.processJobs(), 0);
+      setTimeout(() => {
+        this.processJobs();
+      }, 0);
     });
-
-    this.workerManager.on("job-failed", (workerId, jobId, error) => {
+    
+    this.workerManager.on("job-failed", (jobId: string, error: string) => {
+      console.log(`[JobScheduler] Received job-failed event for ${jobId} with error: ${error}`);
       this.handleJobFailed(jobId, error);
       // Clear recovery attempts for failed jobs
       this.jobRecoveryService.clearRecoveryAttempts(jobId);
       // Immediately try to process more jobs when a worker becomes available
-      setTimeout(() => this.processJobs(), 0);
+      setTimeout(() => {
+        this.processJobs();
+      }, 0);
     });
 
     // Job recovery service event handlers
@@ -283,7 +312,7 @@ export class JobScheduler extends EventEmitter {
       console.error("Job recovery service error:", error);
     });
 
-    this.workerManager.on("batch-completed", (workerId, batchId, result) => {
+    this.workerManager.on("batch-completed", (workerId, result) => {
       this.handleBatchCompleted(result);
       // Immediately try to process more jobs when a worker becomes available
       setTimeout(() => this.processJobs(), 0);
@@ -382,18 +411,21 @@ export class JobScheduler extends EventEmitter {
       });
     }
 
-    // Distribute jobs to worker-local queues first
+    // Execute jobs directly on workers
     try {
-      await this.workerManager.distributeJobsToWorkers(batchJobs);
+      const jobPayloads = batchJobs.map(job => job.jobPayload);
+      const jobIds = batchJobs.map(job => job.jobId);
+      
+      await this.workerManager.executeBatchJobs(jobPayloads, jobIds);
 
-      // Only mark as PROCESSING after successful distribution
+      // Jobs are already marked as PROCESSING by getNextPendingJobs
+      // Just emit job-started events
       for (const job of pendingJobs) {
-        await this.queueBackend.updateJobStatus(job.id, JobStatus.PROCESSING);
         this.emit("job-started", job.id, -1); // Worker ID will be determined by WorkerManager
       }
     } catch (error) {
       console.error(`Error distributing jobs to workers:`, error);
-      // Jobs remain in PENDING status since we didn't mark them as PROCESSING
+      // Jobs remain in PENDING status since we didn't successfully distribute them
       // No need to handle job failures since they were never started
     }
   }
@@ -454,7 +486,7 @@ export class JobScheduler extends EventEmitter {
 
       // Execute job on worker with additional error handling
       try {
-        const result = await this.workerManager.executeJob(jobPayload, context);
+        const result = await this.workerManager.executeJob(jobPayload, jobId);
         // This will be handled by the event handler
       } catch (workerError) {
         // Handle specific worker errors
@@ -482,8 +514,11 @@ export class JobScheduler extends EventEmitter {
    */
   private async executeBatchJobs(batchJobs: BatchJobContext[]): Promise<void> {
     try {
+      // Extract job payloads for the worker manager
+      const jobPayloads = batchJobs.map(batchJob => batchJob.jobPayload);
+      
       // Execute batch on worker
-      const result = await this.workerManager.executeBatchJobs(batchJobs);
+      const result = await this.workerManager.executeBatchJobs(jobPayloads);
 
       // This will be handled by the batch event handler
     } catch (error) {
@@ -518,6 +553,7 @@ export class JobScheduler extends EventEmitter {
     jobId: string,
     result: JobResult,
   ): Promise<void> {
+    console.log(`[JobScheduler] Handling job completion for ${jobId}`);
     try {
       // Skip database operations if shutting down
       if (!this.isShuttingDown) {
@@ -534,6 +570,12 @@ export class JobScheduler extends EventEmitter {
       }
 
       this.emit("job-completed", jobId, result);
+      console.log(`[JobScheduler] Emitted job-completed event for ${jobId}`);
+      
+      // Check if scheduler is now idle and emit event if so
+      if (await this.isIdle()) {
+        this.emit("scheduler-idle");
+      }
     } catch (error) {
       // Don't log errors during shutdown as they're expected
       if (!this.isShuttingDown) {
@@ -549,6 +591,7 @@ export class JobScheduler extends EventEmitter {
     jobId: string,
     errorMessage: string,
   ): Promise<void> {
+    console.log(`[JobScheduler] Handling job failure for ${jobId} with error: ${errorMessage}`);
     try {
       // Skip database operations if shutting down
       if (!this.isShuttingDown) {
@@ -561,6 +604,12 @@ export class JobScheduler extends EventEmitter {
         );
       }
       this.emit("job-failed", jobId, errorMessage);
+      console.log(`[JobScheduler] Emitted job-failed event for ${jobId}`);
+      
+      // Check if scheduler is now idle and emit event if so
+      if (await this.isIdle()) {
+        this.emit("scheduler-idle");
+      }
     } catch (error) {
       // Don't log errors during shutdown as they're expected
       if (!this.isShuttingDown) {

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { PGLiteQueue } from '../src/queue/PGLiteQueue.js';
-import { TaskManager } from '../src/api/TaskManager.js';
-import { JobStatus } from '../src/types/index.js';
+import { PGLiteQueue } from '../src/queue/PGLiteQueue.ts';
+import { TaskManager } from '../src/api/TaskManager.ts';
+import { JobStatus } from '../src/types/index.ts';
 import { resolve } from 'path';
 
 const projectRoot = resolve(process.cwd());
@@ -39,7 +39,7 @@ describe('PGLite Integration', () => {
 
     it('should add and retrieve jobs', async () => {
       const jobPayload = {
-        jobFile: 'test-job.js',
+        jobFile: 'test-job.ts',
         jobPayload: { test: 'data' },
       };
 
@@ -56,11 +56,11 @@ describe('PGLite Integration', () => {
 
     it('should get jobs by status', async () => {
       const jobPayload1 = {
-        jobFile: 'test-job-1.js',
+        jobFile: 'test-job-1.ts',
         jobPayload: { test: 'data1' },
       };
       const jobPayload2 = {
-        jobFile: 'test-job-2.js',
+        jobFile: 'test-job-2.ts',
         jobPayload: { test: 'data2' },
       };
 
@@ -78,7 +78,7 @@ describe('PGLite Integration', () => {
 
     it('should update job status', async () => {
       const jobPayload = {
-        jobFile: 'test-job.js',
+        jobFile: 'test-job.ts',
         jobPayload: { test: 'data' },
       };
 
@@ -111,11 +111,11 @@ describe('PGLite Integration', () => {
 
     it('should get next pending job with row locking', async () => {
       const jobPayload1 = {
-        jobFile: 'test-job-1.js',
+        jobFile: 'test-job-1.ts',
         jobPayload: { priority: 1 },
       };
       const jobPayload2 = {
-        jobFile: 'test-job-2.js',
+        jobFile: 'test-job-2.ts',
         jobPayload: { priority: 2 },
       };
 
@@ -134,8 +134,8 @@ describe('PGLite Integration', () => {
 
     it('should handle queue statistics correctly', async () => {
       // Add some jobs
-      await pgliteQueue.addJob({ jobFile: 'job1.js', jobPayload: {} });
-      await pgliteQueue.addJob({ jobFile: 'job2.js', jobPayload: {} });
+      await pgliteQueue.addJob({ jobFile: 'job1.ts', jobPayload: {} });
+      await pgliteQueue.addJob({ jobFile: 'job2.ts', jobPayload: {} });
       
       let stats = await pgliteQueue.getStats();
       expect(stats.total).toBe(2);
@@ -157,7 +157,7 @@ describe('PGLite Integration', () => {
       expect(await pgliteQueue.isEmpty()).toBe(true);
       expect(await pgliteQueue.hasPendingJobs()).toBe(false);
 
-      await pgliteQueue.addJob({ jobFile: 'job.js', jobPayload: {} });
+      await pgliteQueue.addJob({ jobFile: 'job.ts', jobPayload: {} });
 
       expect(await pgliteQueue.isEmpty()).toBe(false);
       expect(await pgliteQueue.hasPendingJobs()).toBe(true);
@@ -190,7 +190,7 @@ describe('PGLite Integration', () => {
 
     it('should schedule and execute jobs using PGLite backend', async () => {
       const jobId = await taskManager.schedule({
-        jobFile: 'dist/tests/fixtures/SimpleTestJob.js',
+        jobFile: './tests/fixtures/SimpleTestJob.ts',
         jobPayload: { operation: 'add', values: [1, 2] },
       });
 
@@ -205,7 +205,7 @@ describe('PGLite Integration', () => {
 
     it('should handle job status queries with PGLite backend', async () => {
       await taskManager.schedule({
-        jobFile: 'dist/tests/fixtures/SimpleTestJob.js',
+        jobFile: './tests/fixtures/SimpleTestJob.ts',
         jobPayload: { operation: 'add', values: [5, 10] },
       });
 
@@ -224,7 +224,7 @@ describe('PGLite Integration', () => {
     it('should support scheduled jobs', async () => {
       const futureDate = new Date(Date.now() + 1000); // 1 second in the future
       const jobPayload = {
-        jobFile: 'test-job.js',
+        jobFile: 'test-job.ts',
         jobPayload: { scheduled: true },
       };
 
@@ -243,7 +243,7 @@ describe('PGLite Integration', () => {
 
     it('should provide detailed job information', async () => {
       const jobPayload = {
-        jobFile: 'test-job.js',
+        jobFile: 'test-job.ts',
         jobPayload: { detailed: true },
       };
 

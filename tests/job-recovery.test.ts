@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { QueueManager } from '../src/queue/QueueManager.js';
-import { SQLiteQueue } from '../src/queue/SQLiteQueue.js';
-import { JobRecoveryService } from '../src/workers/JobRecoveryService.js';
-import { JobScheduler } from '../src/workers/JobScheduler.js';
-import { JobStatus } from '../src/types/index.js';
+import { QueueManager } from '../src/queue/QueueManager.ts';
+import { SQLiteQueue } from '../src/queue/SQLiteQueue.ts';
+import { JobRecoveryService } from '../src/workers/JobRecoveryService.ts';
+import { JobScheduler } from '../src/workers/JobScheduler.ts';
+import { JobStatus } from '../src/types/index.ts';
 import { randomBytes } from 'node:crypto';
 
 describe('Job Recovery System', () => {
@@ -15,7 +15,7 @@ describe('Job Recovery System', () => {
     beforeEach(async () => {
       testId = randomBytes(8).toString('hex');
       queueManager = new QueueManager({
-        persistenceFile: `test-recovery-${Date.now()}-${testId}.json`,
+        persistenceFile: `test-recovery-${Date.now()}-${testId}.tson`,
         cleanupInterval: 60000,
         maxCompletedJobs: 100,
       });
@@ -71,7 +71,7 @@ describe('Job Recovery System', () => {
 
       // Add a job and manually mark it as processing with old timestamp
       const jobId = await queueManager.addJob({
-        jobFile: 'test-job.js',
+        jobFile: 'test-job.ts',
         jobData: { test: true },
       });
 
@@ -100,7 +100,7 @@ describe('Job Recovery System', () => {
 
       // Add a job
       const jobId = await queueManager.addJob({
-        jobFile: 'test-job.js',
+        jobFile: 'test-job.ts',
         jobData: { test: true },
       });
 
@@ -133,7 +133,7 @@ describe('Job Recovery System', () => {
 
       // Add a stalled job
       const jobId = await queueManager.addJob({
-        jobFile: 'test-job.js',
+        jobFile: 'test-job.ts',
         jobData: { test: true },
       });
 
@@ -172,7 +172,7 @@ describe('Job Recovery System', () => {
       beforeEach(async () => {
         testId = randomBytes(8).toString('hex');
         queueManager = new QueueManager({
-          persistenceFile: `test-recovery-queue-${Date.now()}-${testId}.json`,
+          persistenceFile: `test-recovery-queue-${Date.now()}-${testId}.tson`,
         });
         await queueManager.initialize();
       });
@@ -183,8 +183,8 @@ describe('Job Recovery System', () => {
 
       it('should recover stalled jobs', async () => {
         // Add jobs
-        const jobId1 = await queueManager.addJob({ jobFile: 'test1.js', jobData: {} });
-        const jobId2 = await queueManager.addJob({ jobFile: 'test2.js', jobData: {} });
+        const jobId1 = await queueManager.addJob({ jobFile: 'test1.ts', jobData: {} });
+        const jobId2 = await queueManager.addJob({ jobFile: 'test2.ts', jobData: {} });
 
         // Mark one as stalled
         const job1 = await queueManager.getJobById(jobId1);
@@ -213,7 +213,7 @@ describe('Job Recovery System', () => {
 
       it('should get stalled jobs', async () => {
         // Add a stalled job
-        const jobId = await queueManager.addJob({ jobFile: 'test.js', jobData: {} });
+        const jobId = await queueManager.addJob({ jobFile: 'test.ts', jobData: {} });
         const job = await queueManager.getJobById(jobId);
         if (job) {
           job.status = JobStatus.PROCESSING;
@@ -243,8 +243,8 @@ describe('Job Recovery System', () => {
 
       it('should recover stalled jobs in SQLite', async () => {
         // Add jobs
-        const jobId1 = await sqliteQueue.addJob({ jobFile: 'test1.js', jobData: {} });
-        const jobId2 = await sqliteQueue.addJob({ jobFile: 'test2.js', jobData: {} });
+        const jobId1 = await sqliteQueue.addJob({ jobFile: 'test1.ts', jobData: {} });
+        const jobId2 = await sqliteQueue.addJob({ jobFile: 'test2.ts', jobData: {} });
 
         // Mark jobs as processing (simulate stalled jobs)
         await sqliteQueue.updateJobStatus(jobId1, JobStatus.PROCESSING);
@@ -266,7 +266,7 @@ describe('Job Recovery System', () => {
 
       it('should get stalled jobs from SQLite', async () => {
         // Add a job and mark as processing
-        const jobId = await sqliteQueue.addJob({ jobFile: 'test.js', jobData: {} });
+        const jobId = await sqliteQueue.addJob({ jobFile: 'test.ts', jobData: {} });
         await sqliteQueue.updateJobStatus(jobId, JobStatus.PROCESSING);
 
         // Wait to make it stalled
@@ -287,7 +287,7 @@ describe('Job Recovery System', () => {
     beforeEach(async () => {
       testId = randomBytes(8).toString('hex');
       queueManager = new QueueManager({
-        persistenceFile: `test-scheduler-recovery-${Date.now()}-${testId}.json`,
+        persistenceFile: `test-scheduler-recovery-${Date.now()}-${testId}.tson`,
       });
       
       jobScheduler = new JobScheduler(queueManager, {

@@ -1,626 +1,302 @@
-import { Worker } from "node:worker_threads";
 import { EventEmitter } from "node:events";
-import { resolve, dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { cpus } from "node:os";
-import { ulid } from "ulidx";
 import {
-  WorkerMessage,
-  WorkerMessageType,
-  WorkerState,
+  WebSocketServer,
+  WebSocketConnection,
+} from "../communication/WebSocketServer.js";
+import { QueueOrchestrator } from "./QueueOrchestrator.js";
+import { JobExecutor } from "../jobs/JobExecutor.js";
+import {
   JobPayload,
   JobResult,
-  QueueConfig,
   BatchJobContext,
   BatchExecutionResult,
-  WorkerQueueConfig,
-  RequestJobsPayload,
-  QueueResultPayload,
+  BatchJobResult,
+  WorkerMessage,
+  WorkerMessageType,
+  QueueConfig,
+  JobStatus,
   BaseJobExecutionContext,
 } from "../types/index.js";
-import { JobExecutionContext } from "../jobs/index.js";
-import { QueueOrchestrator } from "./QueueOrchestrator.js";
+import { ulid } from "ulidx";
 
-/**
- * Events emitted by the WorkerManager
- */
+export interface WorkerManagerConfig {
+  numWorkers?: number;
+  projectRoot?: string;
+  silent?: boolean;
+  wsPort?: number;
+  wsHostname?: string;
+  enableHealthCheck?: boolean;
+  healthCheckInterval?: number;
+  jobTimeout?: number;
+  batchTimeout?: number;
+}
+
+interface WorkerState {
+  id: number;
+  busy: boolean;
+  ready: boolean;
+  connectionId?: string;
+  activeJobId?: string;
+  currentJobId?: string;
+}
+
 export interface WorkerManagerEvents {
-  "worker-ready": (workerId: number) => void;
+  initialized: () => void;
   "worker-error": (workerId: number, error: string) => void;
-  "job-started": (workerId: number, jobId: string) => void;
-  "job-completed": (workerId: number, jobId: string, result: JobResult) => void;
-  "job-failed": (workerId: number, jobId: string, error: string) => void;
-  "batch-started": (workerId: number, batchId: string, jobCount: number) => void;
-  "batch-completed": (workerId: number, batchId: string, result: BatchExecutionResult) => void;
-  "all-workers-ready": () => void;
+  "worker-connected": (workerId: number) => void;
+  "worker-ready": (workerId: number) => void;
+  "worker-disconnected": (workerId: number) => void;
+  "job-queued": (jobId: string, jobPayload: JobPayload) => void;
+  "job-result": (jobId: string, result: JobResult) => void;
+  "job-completed": (jobId: string, result: JobResult) => void;
+  "batch-completed": (workerId: number, result: BatchExecutionResult) => void;
+  "job-error": (jobId: string, error: Error) => void;
+  "job-failed": (jobId: string, error: string) => void;
+  shutdown: () => void;
+}
+
+interface PendingJob {
+  resolve: (result: JobResult) => void;
+  reject: (error: Error) => void;
+  timeout?: NodeJS.Timeout;
+  jobId?: string;
+  workerId?: number;
+}
+
+interface PendingBatch {
+  resolve: (result: BatchExecutionResult) => void;
+  reject: (error: Error) => void;
+  timeout?: NodeJS.Timeout;
+  jobIds: Set<string>;
+  results: BatchJobContext[];
+  workerId?: number;
 }
 
 /**
- * Manages a pool of worker threads for job execution
+ * WebSocket-based WorkerManager
+ * Manages worker connections and job distribution via WebSocket
  */
 export class WorkerManager extends EventEmitter {
-  private workers = new Map<number, Worker>();
+  private wsServer: WebSocketServer;
   private workerStates = new Map<number, WorkerState>();
-  private workerJobCounts = new Map<number, number>();
-  private pendingJobs = new Map<
-    string,
-    {
-      resolve: (result: JobResult) => void;
-      reject: (error: Error) => void;
-      timeout?: NodeJS.Timeout;
-    }
-  >();
-  private pendingBatches = new Map<
-    string,
-    {
-      resolve: (result: BatchExecutionResult) => void;
-      reject: (error: Error) => void;
-      timeout?: NodeJS.Timeout;
-    }
-  >();
-
-  private config: Required<QueueConfig>;
+  private workerConnections = new Map<number, WebSocketConnection>();
+  private pendingJobs = new Map<string, PendingJob>();
+  private pendingBatches = new Map<string, PendingBatch>();
+  private config: Required<WorkerManagerConfig>;
   private healthCheckInterval?: NodeJS.Timeout;
   private isShuttingDown = false;
-  private allWorkersReady = false;
   private queueOrchestrator: QueueOrchestrator;
+  private jobExecutor: JobExecutor;
+  private nextWorkerId = 1;
+  private projectRoot: string;
+
   constructor(
-    config: QueueConfig,
-    private projectRoot: string = process.cwd(),
+    queueOrchestrator: QueueOrchestrator,
+    config: WorkerManagerConfig = {},
   ) {
     super();
 
+    this.queueOrchestrator = queueOrchestrator;
+    this.projectRoot = config.projectRoot || process.cwd();
+
     this.config = {
-      maxInMemoryAge: config.maxInMemoryAge || 24 * 60 * 60 * 1000,
-      maxThreads: this.calculateMaxThreads(config.maxThreads),
-      persistenceFile: config.persistenceFile || "queue-state.json",
-      healthCheckInterval: config.healthCheckInterval || 5000,
-      backend: config.backend || 'memory',
-      databaseUrl: config.databaseUrl || '',
+      numWorkers: config.numWorkers || 4,
+      projectRoot: this.projectRoot,
       silent: config.silent || false,
-      jobRecoveryEnabled: config.jobRecoveryEnabled !== false // Default to true
+      wsPort: config.wsPort || 8080,
+      wsHostname: config.wsHostname || "localhost",
+      enableHealthCheck: config.enableHealthCheck !== false,
+      healthCheckInterval: config.healthCheckInterval || 30000,
+      jobTimeout: config.jobTimeout || 30000,
+      batchTimeout: config.batchTimeout || 60000,
     };
 
-    // Initialize queue orchestrator for worker-local queues
-    this.queueOrchestrator = new QueueOrchestrator({
-      workerQueueSize: 500, // Much larger queue for high throughput
-      queueThreshold: 100,  // Higher threshold for continuous flow
-      ackTimeout: 5000,
-      enableWorkerQueues: true,
+    // Initialize WebSocket server
+    this.wsServer = new WebSocketServer({
+      port: this.config.wsPort,
+      hostname: this.config.wsHostname,
     });
 
-    // Set up orchestrator event handlers
+    // Initialize job executor
+    this.jobExecutor = new JobExecutor(this.projectRoot, this.config.jobTimeout);
+
+    this.setupWebSocketHandlers();
     this.setupOrchestratorEvents();
   }
 
   /**
-   * Set up queue orchestrator event handlers
-   */
-  private setupOrchestratorEvents(): void {
-    this.queueOrchestrator.on("distribution-needed", (data) => {
-      // This will be handled by JobScheduler when it calls distributeJobsToWorkers
-    });
-
-    this.queueOrchestrator.on("jobs-distributed", (data) => {
-      // Emit job-started events for each job distributed to the worker
-      for (let i = 0; i < data.jobCount; i++) {
-        this.emit("job-started", data.workerId, `queue-job-${Date.now()}-${i}`);
-
-        // Update worker job count for tracking
-        const currentCount = this.workerJobCounts.get(data.workerId) || 0;
-        this.workerJobCounts.set(data.workerId, currentCount + 1);
-      }
-    });
-
-    this.queueOrchestrator.on("job-result", (data) => {
-      // Acknowledge the job completion
-      this.queueOrchestrator.acknowledgeJob(
-        data.workerId,
-        data.jobId,
-        (workerId, message) => this.sendMessageToWorker(workerId, message)
-      );
-
-      // Emit the job completion event
-      if (data.success) {
-        this.emit("job-completed", data.workerId, data.jobId, data.result);
-      } else {
-        this.emit("job-failed", data.workerId, data.jobId, data.error || "Unknown error");
-      }
-    });
-
-    this.queueOrchestrator.on("worker-registered", (workerId) => {
-      console.log(`Worker ${workerId} registered with orchestrator`);
-    });
-  }
-
-  /**
-   * Initialize all worker threads
+   * Initialize the WorkerManager and wait for workers to connect
    */
   async initialize(): Promise<void> {
-    console.log(`Initializing ${this.config.maxThreads} worker threads...`);
+    // Check if we're running in Bun environment before starting WebSocket server
+    if (typeof globalThis.Bun !== "undefined") {
+      // Start WebSocket server
+      await this.wsServer.start();
 
-    const workerPromises: Promise<void>[] = [];
-
-    for (let i = 0; i < this.config.maxThreads; i++) {
-      workerPromises.push(this.createWorker(i));
-    }
-
-    // Wait for all workers to be ready
-    await Promise.all(workerPromises);
-
-    this.allWorkersReady = true;
-    this.emit("all-workers-ready");
-
-    // Start queue orchestrator
-    this.queueOrchestrator.start();
-
-    // Start health check
-    this.startHealthCheck();
-
-    console.log(`All ${this.config.maxThreads} workers are ready with queue orchestrator`);
-  }
-
-  /**
-   * Execute a job on an available worker
-   */
-  async executeJob(
-    jobPayload: JobPayload,
-    context: BaseJobExecutionContext,
-  ): Promise<JobResult> {
-    if (this.isShuttingDown) {
-      throw new Error("WorkerManager is shutting down");
-    }
-
-    const availableWorker = this.getAvailableWorker();
-    if (!availableWorker) {
-      throw new Error("No available workers");
-    }
-
-    return new Promise((resolve, reject) => {
-      const messageId = ulid();
-      const timeout = jobPayload.jobTimeout || 10000;
-
-      // Set up timeout
-      const timeoutHandle = setTimeout(() => {
-        this.pendingJobs.delete(messageId);
-        reject(new Error(`Job execution timed out after ${timeout}ms`));
-      }, timeout);
-
-      // Store promise resolvers
-      this.pendingJobs.set(messageId, {
-        resolve,
-        reject,
-        timeout: timeoutHandle,
-      });
-
-      // Mark worker as busy
-      const workerState = this.workerStates.get(availableWorker.id)!;
-      workerState.busy = true;
-      workerState.currentJobId = context.jobId;
-      workerState.activeMessageId = messageId; // Store the messageId
-
-      // Emit job started event
-      this.emit("job-started", availableWorker.id, context.jobId);
-
-      // Send job to worker
-      const message: WorkerMessage = {
-        type: WorkerMessageType.EXECUTE_JOB,
-        id: messageId,
-        payload: {
-          jobPayload,
-          context,
-        },
-      };
-
-      availableWorker.worker.postMessage(message);
-    });
-  }
-
-  /**
-   * Execute a batch of jobs on an available worker
-   */
-  async executeBatchJobs(batchJobs: BatchJobContext[]): Promise<BatchExecutionResult> {
-    if (this.isShuttingDown) {
-      throw new Error("WorkerManager is shutting down");
-    }
-
-    if (batchJobs.length === 0) {
-      throw new Error("Batch cannot be empty");
-    }
-
-    const availableWorker = this.getAvailableWorker();
-    if (!availableWorker) {
-      throw new Error("No available workers");
-    }
-
-    return new Promise((resolve, reject) => {
-      const batchId = ulid();
-      const timeout = Math.max(...batchJobs.map(job => job.jobPayload.jobTimeout || 10000));
-
-      // Set up timeout for the entire batch
-      const timeoutHandle = setTimeout(() => {
-        this.pendingJobs.delete(batchId);
-        reject(new Error(`Batch execution timed out after ${timeout}ms`));
-      }, timeout);
-
-      // Store promise resolvers
-      this.pendingBatches.set(batchId, {
-        resolve,
-        reject,
-        timeout: timeoutHandle,
-      });
-
-      // Mark worker as busy
-      const workerState = this.workerStates.get(availableWorker.id)!;
-      workerState.busy = true;
-      workerState.currentJobId = `batch-${batchId}`;
-      workerState.activeMessageId = batchId;
-
-      // Emit batch started event
-      this.emit("batch-started", availableWorker.id, batchId, batchJobs.length);
-
-      // Send batch to worker
-      const message: WorkerMessage = {
-        type: WorkerMessageType.EXECUTE_BATCH_JOBS,
-        id: batchId,
-        payload: {
-          batchJobs,
-        },
-      };
-
-      availableWorker.worker.postMessage(message);
-    });
-  }
-
-  /**
-   * Get an available worker
-   */
-  private getAvailableWorker(): { id: number; worker: Worker } | null {
-    for (const [id, state] of this.workerStates.entries()) {
-      if (state.ready && !state.busy) {
-        const worker = this.workers.get(id);
-        if (worker) {
-          return { id, worker };
-        }
-      }
-    }
-    return null;
-  }
-
-  /**
-   * Check if any workers are available (for worker-local queue system)
-   */
-  hasAvailableWorkers(): boolean {
-    // For immediate job execution, check if we have any ready workers
-    // that are not busy (for direct execution) OR any workers that can accept more jobs
-    const readyWorkers = Array.from(this.workerStates.values()).filter(state => state.ready);
-    if (readyWorkers.length === 0) {
-      return false;
-    }
-
-    // Check for workers available for immediate execution (not busy)
-    const availableForImmediate = readyWorkers.some(state => !state.busy);
-    if (availableForImmediate) {
-      return true;
-    }
-
-    // Check if any workers need more jobs (have space in their queues)
-    const workersNeedingJobs = this.queueOrchestrator.getWorkersNeedingJobs();
-    return workersNeedingJobs.length > 0;
-  }
-
-  /**
-   * Get total number of workers
-   */
-  getWorkerCount(): number {
-    return this.config.maxThreads;
-  }
-
-  /**
-   * Distribute jobs to workers using the queue orchestrator
-   */
-  async distributeJobsToWorkers(jobs: BatchJobContext[]): Promise<void> {
-    const workersNeedingJobs = this.queueOrchestrator.getWorkersNeedingJobs();
-
-    if (workersNeedingJobs.length === 0 || jobs.length === 0) {
-      return;
-    }
-
-    // Distribute jobs evenly among workers that need them
-    const jobsPerWorker = Math.ceil(jobs.length / workersNeedingJobs.length);
-    let jobIndex = 0;
-
-    for (const workerId of workersNeedingJobs) {
-      if (jobIndex >= jobs.length) {
-        break;
-      }
-
-      const workerJobs = jobs.slice(jobIndex, jobIndex + jobsPerWorker);
-      if (workerJobs.length > 0) {
-        await this.queueOrchestrator.distributeJobsToWorker(
-          workerId,
-          workerJobs,
-          (workerId, message) => this.sendMessageToWorker(workerId, message)
-        );
-        jobIndex += workerJobs.length;
-      }
-    }
-  }
-
-  /**
-   * Send message to a specific worker
-   */
-  private sendMessageToWorker(workerId: number, message: WorkerMessage): void {
-    const worker = this.workers.get(workerId);
-    if (worker) {
-      worker.postMessage(message);
+      console.log(
+        `WorkerManager WebSocket server listening on ws://${this.config.wsHostname}:${this.config.wsPort}`,
+      );
+      console.log(`Waiting for ${this.config.numWorkers} workers to connect...`);
     } else {
-      console.warn(`Attempted to send message to unknown worker ${workerId}`);
-    }
-  }
-
-  /**
-   * Get queue orchestrator statistics
-   */
-  getQueueStats() {
-    return this.queueOrchestrator.getStats();
-  }
-
-  /**
-   * Get worker statistics
-   */
-  getWorkerStats(): {
-    total: number;
-    ready: number;
-    busy: number;
-    available: number;
-    distribution: number[];
-    totalJobsProcessed: number;
-  } {
-    let ready = 0;
-    let busy = 0;
-    const distribution: number[] = [];
-    let totalJobsProcessed = 0;
-
-    for (const [workerId, state] of this.workerStates.entries()) {
-      if (state.ready) {
-        ready++;
-        if (state.busy) {
-          busy++;
-        }
+      // In Node.js environment, register workers directly without WebSocket
+      for (let i = 0; i < this.config.numWorkers; i++) {
+        const workerId = this.nextWorkerId++;
+        this.workerStates.set(workerId, {
+          id: workerId,
+          busy: false,
+          ready: true, // Mark as ready immediately in Node.js environment
+        });
+        this.queueOrchestrator.registerWorker(workerId);
       }
-
-      const jobCount = this.workerJobCounts.get(workerId) || 0;
-      distribution.push(jobCount);
-      totalJobsProcessed += jobCount;
+      console.log(`WorkerManager initialized with ${this.config.numWorkers} workers in Node.js mode`);
     }
 
-    return {
-      total: this.workers.size,
-      ready,
-      busy,
-      available: ready - busy,
-      distribution,
-      totalJobsProcessed,
-    };
+    this.emit("initialized");
+
+    // Start health check if enabled and in Bun environment
+    if (this.config.enableHealthCheck && typeof globalThis.Bun !== "undefined") {
+      this.startHealthCheck();
+    }
+
+    // Note: Workers will connect asynchronously
+    // The system will work with whatever workers are available
   }
 
   /**
-   * Shutdown all workers
+   * Set up WebSocket server event handlers
    */
-  async shutdown(): Promise<void> {
-    this.isShuttingDown = true;
+  private setupWebSocketHandlers(): void {
+    // Handle new worker connections
+    this.wsServer.on("connection", (connection: WebSocketConnection) => {
+      const workerId = this.nextWorkerId++;
 
-    // Stop queue orchestrator
-    this.queueOrchestrator.stop();
-
-    if (this.healthCheckInterval) {
-      clearInterval(this.healthCheckInterval);
-    }
-
-    // Clear all pending job timeouts
-    for (const pending of this.pendingJobs.values()) {
-      if (pending.timeout) {
-        clearTimeout(pending.timeout);
-      }
-      pending.reject(new Error("WorkerManager is shutting down"));
-    }
-    this.pendingJobs.clear();
-
-    // Terminate all workers
-    const terminationPromises: Promise<number>[] = [];
-    for (const [workerId, worker] of this.workers.entries()) {
-      // Unregister worker from orchestrator
-      this.queueOrchestrator.unregisterWorker(workerId);
-      terminationPromises.push(worker.terminate());
-    }
-
-    await Promise.all(terminationPromises);
-    this.workers.clear();
-    this.workerStates.clear();
-    this.workerJobCounts.clear();
-    this.pendingBatches.clear();
-
-    console.log("All workers terminated and orchestrator stopped");
-  }
-
-  /**
-   * Create a single worker thread
-   */
-  private async createWorker(workerId: number): Promise<void> {
-    return new Promise((resolve, reject) => {
-      // Determine the correct worker path based on whether we're running from src or dist
-      const __filename = fileURLToPath(import.meta.url);
-      const __dirname = dirname(__filename);
-
-      // Check if we're running from dist (compiled) or src (development)
-      const isCompiledVersion = __dirname.includes("/dist/");
-      const workerPath = isCompiledVersion
-        ? join(__dirname, "worker.js") // Already in dist
-        : join(__dirname, "../../dist/src/workers/worker.js"); // Running from src, point to dist
-
-      const worker = new Worker(workerPath, {
-        workerData: {
-          workerId,
-          projectRoot: this.projectRoot,
-          defaultTimeout: 5000,
-          silent: this.config.silent,
-        },
-      });
+      // Store connection
+      this.workerConnections.set(workerId, connection);
 
       // Initialize worker state
       this.workerStates.set(workerId, {
         id: workerId,
         busy: false,
         ready: false,
+        connectionId: connection.id,
       });
 
-      // Initialize job count
-      this.workerJobCounts.set(workerId, 0);
-
-      // Handle worker errors
-      worker.on("error", (error) => {
-        console.error(`Worker ${workerId} error:`, error);
-        this.emit("worker-error", workerId, error.message);
-        reject(error);
-      });
-
-      // Handle worker exit
-      worker.on("exit", (code) => {
-        if (code !== 0) {
-          console.error(`Worker ${workerId} exited with code ${code}`);
-        }
-
-        const workerState = this.workerStates.get(workerId);
-        if (workerState?.activeMessageId) {
-          const pending = this.pendingJobs.get(workerState.activeMessageId);
-          if (pending) {
-            if (pending.timeout) {
-              clearTimeout(pending.timeout);
-            }
-            pending.reject(
-              new Error(
-                `Worker ${workerId} exited unexpectedly while processing job.`,
-              ),
-            );
-            this.pendingJobs.delete(workerState.activeMessageId);
-            this.emit(
-              "job-failed",
-              workerId,
-              workerState.currentJobId || "unknown",
-              "Worker exited unexpectedly",
-            );
+      // Set up connection handlers through the server
+      this.wsServer.on(
+        "message",
+        (data: { connectionId: string; message: WorkerMessage }) => {
+          if (data.connectionId === connection.id) {
+            this.handleWorkerMessage(workerId, data.message);
           }
-        }
+        },
+      );
 
-        // Unregister worker from orchestrator
-        this.queueOrchestrator.unregisterWorker(workerId);
-
-        this.workerStates.delete(workerId);
-        this.workers.delete(workerId);
-        this.workerJobCounts.delete(workerId);
-
-        // Respawn worker if not shutting down
-        if (!this.isShuttingDown) {
-          console.log(`Respawning worker ${workerId}...`);
-          setTimeout(() => {
-            this.createWorker(workerId).catch((error) => {
-              console.error(`Failed to respawn worker ${workerId}:`, error);
-            });
-          }, 1000); // Wait 1 second before respawning
+      this.wsServer.on("close", (data: { connectionId: string }) => {
+        if (data.connectionId === connection.id) {
+          this.handleWorkerDisconnect(workerId);
         }
       });
 
-      // Wait for worker ready signal
-      const readyTimeout = setTimeout(() => {
-        reject(
-          new Error(`Worker ${workerId} failed to initialize within timeout`),
-        );
-      }, 10000);
+      this.wsServer.on(
+        "error",
+        (data: { connectionId: string; error: Error }) => {
+          if (data.connectionId === connection.id) {
+            console.error(`Worker ${workerId} connection error:`, data.error);
+            this.emit("worker-error", workerId, data.error.message);
+          }
+        },
+      );
 
-      const onReady = () => {
-        clearTimeout(readyTimeout);
-        resolve();
-      };
-
-      // Listen for ready signal
-      worker.once("message", (message: WorkerMessage) => {
-        if (message.type === WorkerMessageType.WORKER_READY) {
-          const state = this.workerStates.get(workerId)!;
-          state.ready = true;
-          this.workers.set(workerId, worker);
-
-          // Register worker with queue orchestrator
-          this.queueOrchestrator.registerWorker(workerId);
-
-          // NOW set up the general message handler after worker is fully initialized
-          worker.on("message", (message: WorkerMessage) => {
-            this.handleWorkerMessage(workerId, message);
-          });
-
-          this.emit("worker-ready", workerId);
-          onReady();
-        } else {
-          reject(
-            new Error(
-              `Unexpected message from worker ${workerId}: ${message.type}`,
-            ),
-          );
-        }
+      // Send initialization message
+      connection.ws.send({
+        type: "init",
+        payload: {
+          workerId,
+          projectRoot: this.projectRoot,
+        },
       });
+
+      this.emit("worker-connected", workerId);
     });
   }
 
   /**
-   * Handle messages from worker threads
+   * Set up queue orchestrator event handlers
+   */
+  private setupOrchestratorEvents(): void {
+    // Listen for job distribution events
+    this.queueOrchestrator.on("jobs-available", async () => {
+      const stats = this.queueOrchestrator.getStats();
+      if (stats.totalPendingJobs > 0 && this.hasAvailableWorkers()) {
+        await this.distributeJobsToWorkers(stats.totalPendingJobs);
+      }
+    });
+
+    // Handle job results from orchestrator
+    this.queueOrchestrator.on(
+      "job-result",
+      (jobId: string, result: JobResult) => {
+        const pending = this.pendingJobs.get(jobId);
+        if (pending) {
+          if (pending.timeout) {
+            clearTimeout(pending.timeout);
+          }
+          pending.resolve(result);
+          this.pendingJobs.delete(jobId);
+        }
+      },
+    );
+
+    // Handle job errors from orchestrator
+    this.queueOrchestrator.on("job-error", (jobId: string, error: Error) => {
+      const pending = this.pendingJobs.get(jobId);
+      if (pending) {
+        if (pending.timeout) {
+          clearTimeout(pending.timeout);
+        }
+        pending.reject(error);
+        this.pendingJobs.delete(jobId);
+      }
+    });
+  }
+
+  /**
+   * Handle messages from workers
    */
   private handleWorkerMessage(workerId: number, message: WorkerMessage): void {
     const workerState = this.workerStates.get(workerId);
-    if (!workerState) {
-      console.error(`Received message from unknown worker ${workerId}`);
-      return;
-    }
+    if (!workerState) return;
 
     switch (message.type) {
       case WorkerMessageType.WORKER_READY:
-        // This should only happen during initialization, but handle it gracefully
-        if (!workerState.ready) {
-          workerState.ready = true;
-          this.emit("worker-ready", workerId);
-        }
-        break;
-
-      case WorkerMessageType.PONG:
-        workerState.lastPing = new Date();
+        workerState.ready = true;
+        this.queueOrchestrator.registerWorker(workerId);
+        this.emit("worker-ready", workerId);
         break;
 
       case WorkerMessageType.JOB_RESULT:
-        this.handleJobResult(workerId, message);
+        this.handleJobResult(workerId, message.payload as JobResult);
         break;
 
       case WorkerMessageType.BATCH_RESULT:
-        this.handleBatchResult(workerId, message);
+        this.handleBatchResult(
+          workerId,
+          message.payload as BatchExecutionResult,
+        );
         break;
 
       case WorkerMessageType.JOB_ERROR:
-        this.handleJobError(workerId, message);
-        break;
-
-      case WorkerMessageType.WORKER_ERROR:
-        console.error(`Worker ${workerId} error:`, message.error);
-        this.emit("worker-error", workerId, message.error || "Unknown error");
+        this.handleJobError(workerId, message.payload);
         break;
 
       case WorkerMessageType.REQUEST_JOBS:
-        this.handleJobRequest(workerId, message);
-        break;
-
-      case WorkerMessageType.QUEUE_RESULT:
-        this.handleQueueResult(workerId, message);
+        // Worker is requesting a job
+        this.distributeJobToWorker(workerId);
         break;
 
       case WorkerMessageType.QUEUE_STATUS:
-        this.handleQueueStatus(workerId, message);
+        // Update worker status
+        Object.assign(workerState, message.payload);
         break;
 
       default:
@@ -632,140 +308,501 @@ export class WorkerManager extends EventEmitter {
   }
 
   /**
-   * Handle successful job result from worker
+   * Handle worker disconnection
    */
-  private handleJobResult(workerId: number, message: WorkerMessage): void {
+  private handleWorkerDisconnect(workerId: number): void {
     const workerState = this.workerStates.get(workerId);
-    if (!workerState) {
-      console.error(`Received job result from unknown worker ${workerId}`);
+    if (!workerState) return;
+
+    // Clean up any pending jobs
+    if (workerState.activeJobId) {
+      const pending = this.pendingJobs.get(workerState.activeJobId);
+      if (pending) {
+        pending.reject(new Error(`Worker ${workerId} disconnected`));
+        this.pendingJobs.delete(workerState.activeJobId);
+      }
+    }
+
+    // Unregister from orchestrator
+    this.queueOrchestrator.unregisterWorker(workerId);
+
+    // Clean up state
+    this.workerStates.delete(workerId);
+    this.workerConnections.delete(workerId);
+
+    this.emit("worker-disconnected", workerId);
+
+    // Log if not shutting down
+    if (!this.isShuttingDown) {
+      console.log(
+        `Worker ${workerId} disconnected. Waiting for reconnection...`,
+      );
+    }
+  }
+
+/**
+   * Execute a single job
+   */
+  async executeJob(jobPayload: JobPayload, jobId?: string): Promise<JobResult> {
+    // Check if we're running in Bun environment
+    if (typeof globalThis.Bun !== "undefined") {
+      const messageId = ulid();
+      const actualJobId = jobId || ulid();
+
+      return new Promise((resolve, reject) => {
+        // Store pending job
+        this.pendingJobs.set(messageId, {
+          resolve,
+          reject,
+          jobId: actualJobId,
+        });
+
+        // Set timeout
+        const timeout = setTimeout(() => {
+          const pending = this.pendingJobs.get(messageId);
+          if (pending) {
+            pending.reject(new Error(`Job ${actualJobId} timed out`));
+            this.pendingJobs.delete(messageId);
+          }
+        }, this.config.jobTimeout);
+
+        this.pendingJobs.get(messageId)!.timeout = timeout;
+
+        // Find available worker
+        const workerId = this.getAvailableWorker();
+        if (workerId === undefined) {
+          // Queue the job - emit event for orchestrator to handle
+          this.emit("job-queued", actualJobId, jobPayload);
+          return;
+        }
+
+        // Send job to worker
+        const connection = this.workerConnections.get(workerId);
+        if (connection) {
+          const workerState = this.workerStates.get(workerId)!;
+          workerState.busy = true;
+          workerState.activeJobId = messageId;
+          workerState.currentJobId = actualJobId;
+
+          connection.ws.send({
+            type: WorkerMessageType.EXECUTE_JOB,
+            id: messageId,
+            payload: { ...jobPayload, id: actualJobId },
+          });
+
+          this.pendingJobs.get(messageId)!.workerId = workerId;
+        }
+      });
+    } else {
+      // In Node.js environment, execute job directly
+      console.log(`[WorkerManager] Worker states: ${Array.from(this.workerStates.entries()).map(([id, state]) => ({id, busy: state.busy, ready: state.ready})).join(', ')}`);
+      const workerId = this.getAvailableWorker();
+      console.log(`[WorkerManager] Found available worker: ${workerId}`);
+      if (workerId === undefined) {
+        throw new Error("No available workers");
+      }
+
+      // Use the provided job ID or generate a new one
+      const actualJobId = jobId || ulid();
+      console.log(`[WorkerManager] Job ID: ${actualJobId}`);
+      const context: BaseJobExecutionContext = {
+        jobId: actualJobId,
+        startTime: Date.now(),
+        queueTime: 0,
+        timeout: jobPayload.jobTimeout || this.config.jobTimeout,
+      };
+
+      // Mark worker as busy
+      const workerState = this.workerStates.get(workerId)!;
+      workerState.busy = true;
+      workerState.currentJobId = actualJobId;
+      console.log(`[WorkerManager] Worker ${workerId} marked as busy for job ${actualJobId}`);
+
+      // Return a promise that resolves when the job completes
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          console.log(`[WorkerManager] Job ${actualJobId} timed out`);
+          reject(new Error(`Job ${actualJobId} timed out`));
+        }, jobPayload.jobTimeout || this.config.jobTimeout);
+
+        console.log(`[WorkerManager] About to execute job with payload:`, jobPayload);
+        // Execute job and emit events for JobScheduler
+        this.jobExecutor.executeJob(jobPayload, context)
+          .then(result => {
+            console.log(`[WorkerManager] Job ${actualJobId} completed with result:`, result);
+            // Mark worker as available again
+            workerState.busy = false;
+            workerState.currentJobId = undefined;
+            
+            // Clear timeout
+            clearTimeout(timeout);
+            
+            // Emit job completion events for JobScheduler
+            console.log(`[WorkerManager] Emitting job-completed event for ${actualJobId}`);
+            this.emit("job-completed", actualJobId, result);
+            
+            resolve(result);
+          })
+          .catch(error => {
+            console.log(`[WorkerManager] Job ${actualJobId} failed with error:`, error);
+            // Mark worker as available again
+            workerState.busy = false;
+            workerState.currentJobId = undefined;
+            
+            // Clear timeout
+            clearTimeout(timeout);
+            
+            // Emit job failure events for JobScheduler
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.log(`[WorkerManager] Emitting job-failed event for ${actualJobId} with error: ${errorMessage}`);
+            this.emit("job-failed", actualJobId, errorMessage);
+            
+            reject(error);
+          });
+      });
+    }
+  }
+
+  /**
+   * Execute a batch of jobs
+   */
+  async executeBatchJobs(jobs: JobPayload[], jobIds?: string[]): Promise<BatchExecutionResult> {
+    // Check if we're running in Bun environment
+    if (typeof globalThis.Bun !== "undefined") {
+      const messageId = ulid();
+      const batchJobIds = jobIds || jobs.map(() => ulid());
+      const jobIdSet = new Set(batchJobIds);
+
+      return new Promise((resolve, reject) => {
+        // Store pending batch
+        this.pendingBatches.set(messageId, {
+          resolve,
+          reject,
+          jobIds: jobIdSet,
+          results: [],
+        });
+
+        // Set timeout
+        const timeout = setTimeout(() => {
+          const pending = this.pendingBatches.get(messageId);
+          if (pending) {
+            pending.reject(new Error("Batch execution timed out"));
+            this.pendingBatches.delete(messageId);
+          }
+        }, this.config.batchTimeout);
+
+        this.pendingBatches.get(messageId)!.timeout = timeout;
+
+        // Find available worker
+        const workerId = this.getAvailableWorker();
+        if (workerId === undefined) {
+          // Queue the jobs individually - emit events for orchestrator
+          for (let i = 0; i < jobs.length; i++) {
+            const jobId = (jobIds && jobIds[i]) || ulid();
+            this.emit("job-queued", jobId, jobs[i]);
+          }
+          return;
+        }
+
+        // Send batch to worker
+        const connection = this.workerConnections.get(workerId);
+        if (connection) {
+          const workerState = this.workerStates.get(workerId)!;
+          workerState.busy = true;
+          workerState.activeJobId = messageId;
+
+          connection.ws.send({
+            type: WorkerMessageType.EXECUTE_BATCH_JOBS,
+            id: messageId,
+            payload: jobs,
+          });
+
+          this.pendingBatches.get(messageId)!.workerId = workerId;
+        }
+      });
+    } else {
+      // In Node.js environment, execute jobs directly
+      const workerId = this.getAvailableWorker();
+      if (workerId === undefined) {
+        throw new Error("No available workers");
+      }
+
+      const batchId = ulid();
+      const jobResults: BatchJobResult[] = [];
+      
+      // Mark worker as busy
+      const workerState = this.workerStates.get(workerId)!;
+      workerState.busy = true;
+      workerState.currentJobId = batchId;
+
+      try {
+        let successCount = 0;
+        let failureCount = 0;
+
+        // Execute each job in the batch
+        for (let i = 0; i < jobs.length; i++) {
+          // Use provided job ID or generate a new one
+          const jobId = (jobIds && jobIds[i]) || ulid();
+          try {
+            const context: BaseJobExecutionContext = {
+              jobId: jobId,
+              startTime: Date.now(),
+              queueTime: 0,
+              timeout: jobs[i].jobTimeout || this.config.jobTimeout,
+            };
+
+            const result = await this.jobExecutor.executeJob(jobs[i], context);
+            jobResults.push({
+              jobId,
+              success: true,
+              result,
+            });
+            successCount++;
+          } catch (error) {
+            jobResults.push({
+              jobId,
+              success: false,
+              error: error instanceof Error ? error.message : String(error),
+            });
+            failureCount++;
+          }
+        }
+
+        // Mark worker as available again
+        workerState.busy = false;
+        workerState.currentJobId = undefined;
+
+        const batchResult: BatchExecutionResult = {
+          batchId,
+          results: jobResults,
+          totalJobs: jobs.length,
+          successCount,
+          failureCount,
+        };
+
+        // Emit batch completion events for JobScheduler
+        this.emit("batch-completed", workerId, batchResult);
+
+        return batchResult;
+      } catch (error) {
+        // Mark worker as available again
+        workerState.busy = false;
+        workerState.currentJobId = undefined;
+        
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Get an available worker
+   */
+  private getAvailableWorker(): number | undefined {
+    for (const [workerId, state] of this.workerStates) {
+      if (state.ready && !state.busy) {
+        return workerId;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Distribute a job to a specific worker
+   */
+  private async distributeJobToWorker(workerId: number): Promise<void> {
+    const workerState = this.workerStates.get(workerId);
+    const connection = this.workerConnections.get(workerId);
+
+    if (!workerState || !connection || workerState.busy) {
       return;
     }
 
-    // Mark worker as available
-    const jobId = workerState.currentJobId || "unknown";
-    workerState.busy = false;
-    workerState.currentJobId = undefined;
-    workerState.activeMessageId = undefined;
+    // For now, we'll rely on the orchestrator to push jobs to workers
+    // rather than pulling from a queue
+    return;
+  }
 
-    if (message.id) {
-      const pending = this.pendingJobs.get(message.id);
-      if (pending) {
-        if (pending.timeout) {
-          clearTimeout(pending.timeout);
-        }
-        pending.resolve(message.payload.result);
-        this.pendingJobs.delete(message.id);
+  /**
+   * Distribute jobs to available workers
+   */
+  private async distributeJobsToWorkers(maxJobs: number): Promise<void> {
+    let distributed = 0;
 
-        // Increment job count for this worker
-        const currentCount = this.workerJobCounts.get(workerId) || 0;
-        this.workerJobCounts.set(workerId, currentCount + 1);
-
-        this.emit("job-completed", workerId, jobId, message.payload.result);
-      } else {
-        // This can happen when a job times out but then actually completes
-        // We should still emit the completion event to ensure proper job tracking
-        console.warn(`No pending job found for message ID ${message.id}, but job ${jobId} completed successfully (likely after timeout)`);
-
-        // Still increment job count for tracking
-        const currentCount = this.workerJobCounts.get(workerId) || 0;
-        this.workerJobCounts.set(workerId, currentCount + 1);
-
-        this.emit("job-completed", workerId, jobId, message.payload.result);
+    for (const [workerId, state] of this.workerStates) {
+      if (distributed >= maxJobs) break;
+      if (state.ready && !state.busy) {
+        await this.distributeJobToWorker(workerId);
+        distributed++;
       }
-    } else {
-      console.warn(`Job result message missing ID from worker ${workerId}`);
     }
+  }
+
+  /**
+   * Handle job result from worker
+   */
+  private handleJobResult(workerId: number, result: JobResult): void {
+    const workerState = this.workerStates.get(workerId);
+    if (!workerState) return;
+
+    // Mark worker as available
+    workerState.busy = false;
+    workerState.activeJobId = undefined;
+    workerState.currentJobId = undefined;
+
+    // Emit job completion event for orchestrator
+    const jobId = workerState.currentJobId;
+    if (jobId) {
+      this.emit("job-result", jobId, result);
+      this.emit("job-completed", jobId, result);
+    }
+
+    // Resolve pending job if exists
+    const pending = this.pendingJobs.get(workerState.activeJobId || "");
+    if (pending) {
+      if (pending.timeout) {
+        clearTimeout(pending.timeout);
+      }
+      pending.resolve(result);
+      this.pendingJobs.delete(workerState.activeJobId || "");
+    }
+
+    // Try to get another job
+    this.distributeJobToWorker(workerId);
   }
 
   /**
    * Handle batch result from worker
    */
-  private handleBatchResult(workerId: number, message: WorkerMessage): void {
+  private handleBatchResult(
+    workerId: number,
+    result: BatchExecutionResult,
+  ): void {
     const workerState = this.workerStates.get(workerId);
-    if (!workerState) {
-      console.error(`Received batch result from unknown worker ${workerId}`);
-      return;
-    }
+    if (!workerState) return;
 
     // Mark worker as available
-    const batchId = workerState.currentJobId || "unknown";
     workerState.busy = false;
-    workerState.currentJobId = undefined;
-    workerState.activeMessageId = undefined;
+    workerState.activeJobId = undefined;
 
-    if (message.id) {
-      const pending = this.pendingBatches.get(message.id);
-      if (pending) {
-        if (pending.timeout) {
-          clearTimeout(pending.timeout);
-        }
-
-        const batchResult = message.payload.result as BatchExecutionResult;
-
-        // Update job counts for this worker
-        const currentCount = this.workerJobCounts.get(workerId) || 0;
-        this.workerJobCounts.set(workerId, currentCount + batchResult.totalJobs);
-
-        pending.resolve(batchResult);
-        this.pendingBatches.delete(message.id);
-
-        this.emit("batch-completed", workerId, batchId, batchResult);
-      } else {
-        console.warn(`No pending batch found for message ID ${message.id}, but batch ${batchId} completed (likely after timeout)`);
-
-        // Still update job counts for tracking
-        const batchResult = message.payload.result as BatchExecutionResult;
-        const currentCount = this.workerJobCounts.get(workerId) || 0;
-        this.workerJobCounts.set(workerId, currentCount + batchResult.totalJobs);
-
-        this.emit("batch-completed", workerId, batchId, batchResult);
+    // Resolve pending batch if exists
+    const pending = this.pendingBatches.get(workerState.activeJobId || "");
+    if (pending) {
+      if (pending.timeout) {
+        clearTimeout(pending.timeout);
       }
-    } else {
-      console.warn(`Batch result message missing ID from worker ${workerId}`);
+      pending.resolve(result);
+      this.pendingBatches.delete(workerState.activeJobId || "");
     }
+
+    this.emit("batch-completed", workerId, result);
+
+    // Try to get another job
+    this.distributeJobToWorker(workerId);
   }
 
   /**
    * Handle job error from worker
    */
-  private handleJobError(workerId: number, message: WorkerMessage): void {
-    const workerState = this.workerStates.get(workerId)!;
+  private handleJobError(workerId: number, payload: any): void {
+    const workerState = this.workerStates.get(workerId);
+    if (!workerState) return;
+
+    // Mark worker as available
     workerState.busy = false;
-    const jobId = workerState.currentJobId || "unknown";
+    const jobId = workerState.currentJobId || ulid();
+    workerState.activeJobId = undefined;
     workerState.currentJobId = undefined;
-    workerState.activeMessageId = undefined;
 
-    if (message.id) {
-      const pending = this.pendingJobs.get(message.id);
-      if (pending) {
-        if (pending.timeout) {
-          clearTimeout(pending.timeout);
-        }
-        pending.reject(new Error(message.error || "Job execution failed"));
-        this.pendingJobs.delete(message.id);
+    // Create error result
+    const error = new Error(payload.error || "Job execution failed");
+    const result: JobResult = {
+      results: { error: error.message },
+      executionTime: 0,
+      queueTime: 0,
+    };
 
-        this.emit(
-          "job-failed",
-          workerId,
-          jobId,
-          message.error || "Unknown error",
-        );
-      } else {
-        // This can happen when a job times out but then actually fails
-        // We should still emit the failure event to ensure proper job tracking
-        console.warn(`No pending job found for error message ID ${message.id}, but job ${jobId} failed (likely after timeout)`);
-        this.emit(
-          "job-failed",
-          workerId,
-          jobId,
-          message.error || "Unknown error",
-        );
-      }
+    // Emit job error event for orchestrator
+    if (workerState.currentJobId) {
+      this.emit("job-error", workerState.currentJobId, error);
     }
+
+    // Resolve pending job if exists
+    const pending = this.pendingJobs.get(workerState.activeJobId || "");
+    if (pending) {
+      if (pending.timeout) {
+        clearTimeout(pending.timeout);
+      }
+      pending.reject(error);
+      this.pendingJobs.delete(workerState.activeJobId || "");
+    }
+
+    this.emit("job-error", jobId, error);
+    this.emit("job-failed", jobId, error.message);
+
+    // Try to get another job
+    this.distributeJobToWorker(workerId);
   }
 
   /**
-   * Start periodic health check of workers
+   * Check if there are available workers
+   */
+  hasAvailableWorkers(): boolean {
+    for (const state of this.workerStates.values()) {
+      if (state.ready && !state.busy) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Get worker count
+   */
+  getWorkerCount(): number {
+    return this.workerStates.size;
+  }
+
+  /**
+   * Get queue statistics
+   */
+  async getQueueStats(): Promise<any> {
+    return this.queueOrchestrator.getStats();
+  }
+
+  /**
+   * Get worker statistics
+   */
+  getWorkerStats(): any {
+    const stats = {
+      total: this.workerStates.size,
+      ready: 0,
+      available: 0,
+      busy: 0,
+      workers: [] as any[],
+    };
+
+    for (const [workerId, state] of this.workerStates) {
+      if (state.ready && !state.busy) {
+        stats.available++;
+        stats.ready++;
+      } else if (state.busy) {
+        stats.busy++;
+        stats.ready++;
+      }
+
+      stats.workers.push({
+        id: workerId,
+        ready: state.ready,
+        busy: state.busy,
+        currentJob: state.currentJobId,
+      });
+    }
+
+    return stats;
+  }
+
+  /**
+   * Start health check interval
    */
   private startHealthCheck(): void {
     this.healthCheckInterval = setInterval(() => {
@@ -774,56 +811,64 @@ export class WorkerManager extends EventEmitter {
   }
 
   /**
-   * Perform health check by pinging all workers
+   * Perform health check on all workers
    */
   private performHealthCheck(): void {
-    for (const [workerId, worker] of this.workers.entries()) {
-      const message: WorkerMessage = {
+    for (const [workerId, connection] of this.workerConnections) {
+      connection.ws.send({
         type: WorkerMessageType.PING,
         id: ulid(),
-      };
-      worker.postMessage(message);
+      });
     }
   }
 
   /**
-   * Handle job request from worker
+   * Shutdown the WorkerManager
    */
-  private handleJobRequest(workerId: number, message: WorkerMessage): void {
-    const payload = message.payload as RequestJobsPayload;
-    this.queueOrchestrator.handleJobRequest(workerId, payload);
-  }
+  async shutdown(): Promise<void> {
+    this.isShuttingDown = true;
 
-  /**
-   * Handle queue result from worker
-   */
-  private handleQueueResult(workerId: number, message: WorkerMessage): void {
-    const payload = message.payload as QueueResultPayload;
-    this.queueOrchestrator.handleJobResult(workerId, payload);
-  }
-
-  /**
-   * Handle queue status from worker
-   */
-  private handleQueueStatus(workerId: number, message: WorkerMessage): void {
-    // Update orchestrator with worker status if needed
-    // This is mainly for monitoring purposes
-  }
-
-  /**
-   * Calculate maximum number of threads based on configuration
-   */
-  private calculateMaxThreads(maxThreads?: number): number {
-    const cpuCount = cpus().length;
-
-    if (maxThreads === undefined) {
-      return Math.max(1, cpuCount - 2);
+    // Stop health check
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = undefined;
     }
 
-    if (maxThreads < 0) {
-      return Math.max(1, cpuCount + maxThreads);
+    // Cancel all pending jobs
+    for (const [messageId, pending] of this.pendingJobs) {
+      if (pending.timeout) {
+        clearTimeout(pending.timeout);
+      }
+      pending.reject(new Error("WorkerManager is shutting down"));
+    }
+    this.pendingJobs.clear();
+
+    // Cancel all pending batches
+    for (const [messageId, pending] of this.pendingBatches) {
+      if (pending.timeout) {
+        clearTimeout(pending.timeout);
+      }
+      pending.reject(new Error("WorkerManager is shutting down"));
+    }
+    this.pendingBatches.clear();
+
+    // Close all worker connections
+    for (const [workerId, connection] of this.workerConnections) {
+      connection.ws.send({
+        type: WorkerMessageType.WORKER_ERROR,
+        id: ulid(),
+        payload: { message: "Shutting down" },
+      });
+      connection.ws.close();
     }
 
-    return Math.max(1, maxThreads);
+    // Stop WebSocket server
+    await this.wsServer.stop();
+
+    // Clear state
+    this.workerStates.clear();
+    this.workerConnections.clear();
+
+    this.emit("shutdown");
   }
 }

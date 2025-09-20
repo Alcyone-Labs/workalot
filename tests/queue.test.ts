@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { unlink } from 'fs/promises';
-import { QueueManager } from '../src/queue/index.js';
-import { JobStatus, JobPayload } from '../src/types/index.js';
+import { QueueManager } from '../src/queue/index.ts';
+import { JobStatus, JobPayload } from '../src/types/index.ts';
 
 describe('Queue System', () => {
   let queueManager: QueueManager;
@@ -9,7 +9,7 @@ describe('Queue System', () => {
 
   beforeEach(async () => {
     // Use unique file name for each test to avoid conflicts
-    testPersistenceFile = `test-queue-state-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.json`;
+    testPersistenceFile = `test-queue-state-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.tson`;
 
     queueManager = new QueueManager({
       persistenceFile: testPersistenceFile,
