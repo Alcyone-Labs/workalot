@@ -1,17 +1,20 @@
 // Queue backend interface
-export { IQueueBackend, type QueueStats } from './IQueueBackend.js';
+export { IQueueBackend, type QueueStats } from "./IQueueBackend.js";
 
 // In-memory queue implementation
-export { QueueManager, type QueueManagerEvents } from './QueueManager.js';
+export { QueueManager, type QueueManagerEvents } from "./QueueManager.js";
 
-// PostgreSQL queue implementation (stub)
-export { PostgreSQLQueue } from './PostgreSQLQueue.js';
+// PostgreSQL queue implementation
+export { PostgreSQLQueue } from "./PostgreSQLQueue.js";
 
 // PGLite queue implementation
-export { PGLiteQueue, type PGLiteQueueConfig } from './PGLiteQueue.js';
+export { PGLiteQueue, type PGLiteQueueConfig } from "./PGLiteQueue.js";
 
 // SQLite queue implementation
-export { SQLiteQueue, type SQLiteQueueConfig } from './SQLiteQueue.js';
+export { SQLiteQueue, type SQLiteQueueConfig } from "./SQLiteQueue.js";
+
+// Redis queue implementation
+export { RedisQueue, type RedisQueueConfig } from "./RedisQueue.js";
 
 // Queue factory
 export {
@@ -19,5 +22,6 @@ export {
   createQueue,
   createPGLiteQueue,
   createSQLiteQueue,
-  createAutoQueue
-} from './QueueFactory.js';
+  createRedisQueue,
+  createAutoQueue,
+} from "./QueueFactory.js";

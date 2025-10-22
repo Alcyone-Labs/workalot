@@ -1,13 +1,21 @@
 {
   "name": "@alcyone-labs/workalot",
-  "version": "1.0.0",
+  "version": "2.0.0-alpha",
   "description": "High-performance, multi-threaded job queue system for NodeJS/BunJS. Achieve high throughput jobs/sec with linear worker scaling.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
+  "imports": {
+    "#/*": "./src/*",
+    "#examples/jobs/*": "./examples/_jobs/*"
+  },
   "scripts": {
-    "build": "tsc && cp -r src/queue/migrations dist/queue/",
+    "build": "tsc && tsc-alias && cp -r src/queue/migrations dist/queue/",
+    "build:examples": "tsc --project tsconfig.examples.json && tsc-alias --project tsconfig.examples.json",
+    "build:all": "pnpm run build && pnpm run build:examples",
     "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "typecheck:examples": "tsc --project tsconfig.examples.json --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -30,6 +38,7 @@
     "example:quick-start": "pnpm run build && bun run examples/quick-start.ts",
     "example:performance": "pnpm run build && bun run examples/performance-test.ts",
     "example:errors": "pnpm run build && bun run examples/error-handling.ts",
+    "example:fullstack": "bun run examples/full-stack/backend/server.ts",
     "examples": "pnpm run example:quick-start",
     "clean": "rm -rf dist",
     "prepublishOnly": "pnpm run clean && pnpm run build"
@@ -64,8 +73,11 @@
     "LICENSE"
   ],
   "dependencies": {
+    "@elysiajs/cors": "^1.4.0",
+    "@elysiajs/static": "^1.4.4",
     "elysia": "^1.4.6",
-    "pg": "^8.16.3",
+    "ioredis": "^5.8.2",
+    "postgres": "^3.4.7",
     "ulidx": "^2.4.1"
   },
   "optionalDependencies": {
@@ -76,9 +88,10 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/bun": "^1.2.22",
     "@types/cli-progress": "^3.11.6",
+    "@types/ioredis": "^5.0.0",
     "@types/node": "^22.18.6",
-    "@types/pg": "^8.15.5",
     "cli-progress": "^3.12.0",
+    "tsc-alias": "^1.8.16",
     "typescript": "^5.9.2",
     "vite": "^6.3.6",
     "vite-tsconfig-paths": "^5.1.4",

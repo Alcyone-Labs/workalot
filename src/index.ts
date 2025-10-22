@@ -75,6 +75,9 @@ export type {
   JobExecutionContext,
   WorkerQueueStatus,
   WorkerQueueConfig,
+
+  // Channel messaging types
+  ChannelMessage,
 } from "./types/index.js";
 
 // Value exports

@@ -17,7 +17,12 @@
     "allowSyntheticDefaultImports": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "types": ["node", "bun", "vitest/globals"]
+    "types": ["node", "bun", "vitest/globals"],
+    "baseUrl": ".",
+    "paths": {
+      "#/*": ["src/*"],
+      "#examples/jobs/*": ["examples/_jobs/*"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]

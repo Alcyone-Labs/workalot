@@ -1,6 +1,10 @@
 import { Elysia, t } from "elysia";
 import { EventEmitter } from "node:events";
-import { WorkerMessage, WorkerMessageType } from "../types/index.js";
+import {
+  WorkerMessage,
+  WorkerMessageType,
+  type ChannelMessage,
+} from "../types/index.js";
 import { ulid } from "ulidx";
 
 export interface WebSocketConnection {
@@ -12,6 +16,8 @@ export interface WebSocketConnection {
   lastPong?: Date;
   pendingMessages: Map<string, PendingMessage>;
 }
+
+export type { ChannelMessage } from "../types/index.js";
 
 export interface PendingMessage {
   message: WorkerMessage;
@@ -31,10 +37,18 @@ export interface WebSocketServerConfig {
 }
 
 export interface MessageRoute {
-  pattern: string | RegExp;
+  pattern: string | RegExp | ((message: WorkerMessage) => boolean);
   handler: (
     connection: WebSocketConnection,
-    message: WorkerMessage,
+    message: WorkerMessage
+  ) => Promise<void> | void;
+  priority?: number;
+}
+
+export interface ChannelRoute {
+  handler: (
+    connection: WebSocketConnection,
+    message: ChannelMessage
   ) => Promise<void> | void;
   priority?: number;
 }
@@ -49,6 +63,7 @@ export class WebSocketServer extends EventEmitter {
   private connections = new Map<string, WebSocketConnection>();
   private workerConnections = new Map<number, string>();
   private messageRoutes: MessageRoute[] = [];
+  private channelRoutes: ChannelRoute[] = [];
   private heartbeatInterval?: NodeJS.Timeout;
   private isRunning = false;
 
@@ -68,7 +83,7 @@ export class WebSocketServer extends EventEmitter {
   /**
    * Start the WebSocket server
    */
-async start(): Promise<void> {
+  async start(): Promise<void> {
     if (this.isRunning) {
       throw new Error("WebSocket server is already running");
     }
@@ -140,7 +155,7 @@ async start(): Promise<void> {
           port: this.config.port,
           hostname: this.config.hostname,
         });
-      
+
       this.isRunning = true;
 
       // Start heartbeat if enabled
@@ -240,6 +255,46 @@ async start(): Promise<void> {
   }
 
   /**
+   * Register a channel route
+   */
+  registerChannelRoute(route: ChannelRoute): void {
+    this.channelRoutes.push(route);
+    this.channelRoutes.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+  }
+
+  /**
+   * Register a structured route with custom predicate
+   */
+  registerStructuredRoute(
+    predicate: (message: WorkerMessage) => boolean,
+    handler: (
+      connection: WebSocketConnection,
+      message: WorkerMessage
+    ) => Promise<void> | void,
+    priority?: number
+  ): void {
+    const route: MessageRoute = {
+      pattern: (message: WorkerMessage) => predicate(message),
+      handler,
+      priority,
+    };
+    this.registerRoute(route);
+  }
+
+  /**
+   * Send a channel message to a specific worker
+   */
+  sendChannelToWorker(workerId: number, message: ChannelMessage): boolean {
+    const channelMessage: WorkerMessage = {
+      type: WorkerMessageType.CHANNEL,
+      id: ulid(),
+      payload: message,
+    };
+
+    return this.sendToWorker(workerId, channelMessage);
+  }
+
+  /**
    * Get connection by ID
    */
   getConnection(connectionId: string): WebSocketConnection | undefined {
@@ -259,7 +314,7 @@ async start(): Promise<void> {
   private sendMessage(
     connection: WebSocketConnection,
     message: WorkerMessage,
-    isRetry = false,
+    isRetry = false
   ): boolean {
     try {
       // Send the message using Elysia's send method
@@ -294,7 +349,7 @@ async start(): Promise<void> {
    */
   private async handleMessage(
     connection: WebSocketConnection,
-    message: WorkerMessage,
+    message: WorkerMessage
   ): Promise<void> {
     // Update last activity
     connection.lastPing = new Date();
@@ -311,6 +366,15 @@ async start(): Promise<void> {
     // Handle pong messages
     if (message.type === WorkerMessageType.PONG) {
       connection.lastPong = new Date();
+      return;
+    }
+
+    // Handle channel messages
+    if (message.type === WorkerMessageType.CHANNEL && message.payload) {
+      const channelMessage = message.payload as ChannelMessage;
+      for (const route of this.channelRoutes) {
+        await route.handler(connection, channelMessage);
+      }
       return;
     }
 
@@ -338,10 +402,13 @@ async start(): Promise<void> {
    */
   private matchesRoute(
     message: WorkerMessage,
-    pattern: string | RegExp,
+    pattern: string | RegExp | ((message: WorkerMessage) => boolean)
   ): boolean {
     if (typeof pattern === "string") {
       return message.type === pattern;
+    }
+    if (typeof pattern === "function") {
+      return pattern(message);
     }
     return pattern.test(message.type);
   }
@@ -351,7 +418,7 @@ async start(): Promise<void> {
    */
   private trackPendingMessage(
     connection: WebSocketConnection,
-    message: WorkerMessage,
+    message: WorkerMessage
   ): void {
     if (!message.id) return;
 
@@ -374,7 +441,7 @@ async start(): Promise<void> {
    */
   private handleAcknowledgment(
     connection: WebSocketConnection,
-    messageId: string,
+    messageId: string
   ): void {
     const pending = connection.pendingMessages.get(messageId);
     if (pending) {
@@ -395,7 +462,7 @@ async start(): Promise<void> {
    */
   private handleMessageTimeout(
     connection: WebSocketConnection,
-    messageId: string,
+    messageId: string
   ): void {
     const pending = connection.pendingMessages.get(messageId);
     if (!pending) return;
@@ -433,7 +500,7 @@ async start(): Promise<void> {
    */
   private async handleWorkerReady(
     connection: WebSocketConnection,
-    message: WorkerMessage,
+    message: WorkerMessage
   ): Promise<void> {
     const workerId = message.payload?.workerId;
     if (!workerId) return;
@@ -464,7 +531,7 @@ async start(): Promise<void> {
    */
   private async sendAcknowledgment(
     connection: WebSocketConnection,
-    messageId: string,
+    messageId: string
   ): Promise<void> {
     const ackMessage: WorkerMessage = {
       type: WorkerMessageType.JOB_ACK,

@@ -1,14 +1,14 @@
--- Initial schema for PGLite job queue
+-- Initial schema for PostgreSQL job queue
 -- Optimized for high-performance job processing with proper indexing
 
--- Note: PGLite doesn't support uuid-ossp extension, so we'll use TEXT IDs
+-- Note: PostgreSQL supports uuid-ossp extension
 
 -- Job status enum
 CREATE TYPE job_status AS ENUM ('pending', 'processing', 'completed', 'failed');
 
 -- Main jobs table
-CREATE TABLE jobs (
-    id TEXT PRIMARY KEY,
+CREATE TABLE workalot_jobs (
+    id TEXT,
     job_payload JSONB NOT NULL,
     status job_status NOT NULL DEFAULT 'pending',
     
@@ -38,28 +38,28 @@ CREATE TABLE jobs (
     tags TEXT[],
     
     -- Constraints
-    CONSTRAINT jobs_status_timestamps_check CHECK (
+    CONSTRAINT workalot_jobs_pkey PRIMARY KEY (id),
+    CONSTRAINT workalot_jobs_status_timestamps_check CHECK (
         (status = 'pending' AND started_at IS NULL AND completed_at IS NULL) OR
         (status = 'processing' AND started_at IS NOT NULL AND completed_at IS NULL) OR
         (status IN ('completed', 'failed') AND started_at IS NOT NULL AND completed_at IS NOT NULL)
     ),
-    CONSTRAINT jobs_retry_count_check CHECK (retry_count >= 0 AND retry_count <= max_retries),
-    CONSTRAINT jobs_priority_check CHECK (priority >= 0)
+    CONSTRAINT workalot_jobs_retry_count_check CHECK (retry_count >= 0 AND retry_count <= max_retries),
+    CONSTRAINT workalot_jobs_priority_check CHECK (priority >= 0)
 );
 
 -- Indexes for optimal performance
-CREATE INDEX idx_jobs_status ON jobs (status);
-CREATE INDEX idx_jobs_status_priority ON jobs (status, priority DESC, requested_at ASC) WHERE status = 'pending';
-CREATE INDEX idx_jobs_scheduled_for ON jobs (scheduled_for) WHERE scheduled_for IS NOT NULL AND status = 'pending';
-CREATE INDEX idx_jobs_worker_id ON jobs (worker_id) WHERE worker_id IS NOT NULL;
-CREATE INDEX idx_jobs_requested_at ON jobs (requested_at);
-CREATE INDEX idx_jobs_completed_at ON jobs (completed_at) WHERE completed_at IS NOT NULL;
-CREATE INDEX idx_jobs_tags ON jobs USING GIN (tags) WHERE tags IS NOT NULL;
-CREATE INDEX idx_jobs_payload ON jobs USING GIN (job_payload);
+CREATE INDEX idx_workalot_jobs_status ON workalot_jobs (status);
+CREATE INDEX idx_workalot_jobs_status_priority ON workalot_jobs (status, priority DESC, requested_at ASC) WHERE status = 'pending';
+CREATE INDEX idx_workalot_jobs_scheduled_for ON workalot_jobs (scheduled_for) WHERE scheduled_for IS NOT NULL AND status = 'pending';
+CREATE INDEX idx_workalot_jobs_worker_id ON workalot_jobs (worker_id) WHERE worker_id IS NOT NULL;
+CREATE INDEX idx_workalot_jobs_requested_at ON workalot_jobs (requested_at);
+CREATE INDEX idx_workalot_jobs_completed_at ON workalot_jobs (completed_at) WHERE completed_at IS NOT NULL;
+CREATE INDEX idx_workalot_jobs_tags ON workalot_jobs USING GIN (tags) WHERE tags IS NOT NULL;
+CREATE INDEX idx_workalot_jobs_payload ON workalot_jobs USING GIN (job_payload);
 
 -- Partial indexes for common queries
-CREATE INDEX idx_jobs_active ON jobs (last_updated) WHERE status IN ('pending', 'processing');
--- Note: Removed time-based index predicate as PGLite requires IMMUTABLE functions
+CREATE INDEX idx_workalot_jobs_active ON workalot_jobs (last_updated) WHERE status IN ('pending', 'processing');
 
 -- Function to automatically update last_updated timestamp
 CREATE OR REPLACE FUNCTION update_last_updated_column()
@@ -71,8 +71,8 @@ END;
 $$ language 'plpgsql';
 
 -- Trigger to automatically update last_updated
-CREATE TRIGGER update_jobs_last_updated 
-    BEFORE UPDATE ON jobs 
+CREATE TRIGGER update_workalot_jobs_last_updated 
+    BEFORE UPDATE ON workalot_jobs 
     FOR EACH ROW 
     EXECUTE FUNCTION update_last_updated_column();
 
@@ -96,7 +96,7 @@ BEGIN
     SELECT j.id, j.job_payload, j.status, j.requested_at, j.priority, 
            j.scheduled_for, j.timeout_ms, j.retry_count, j.max_retries
     INTO job_record
-    FROM jobs j
+    FROM workalot_jobs j
     WHERE j.status = 'pending'
       AND (j.scheduled_for IS NULL OR j.scheduled_for <= NOW())
     ORDER BY j.priority DESC, j.requested_at ASC
@@ -105,11 +105,11 @@ BEGIN
     
     -- If we found a job, update it to processing status
     IF FOUND THEN
-        UPDATE jobs 
+        UPDATE workalot_jobs 
         SET status = 'processing',
             started_at = NOW(),
             worker_id = worker_id_param
-        WHERE jobs.id = job_record.id;
+        WHERE workalot_jobs.id = job_record.id;
         
         -- Return the job details
         RETURN QUERY SELECT 
@@ -134,7 +134,7 @@ RETURNS INTEGER AS $$
 DECLARE
     deleted_count INTEGER;
 BEGIN
-    DELETE FROM jobs 
+    DELETE FROM workalot_jobs 
     WHERE status IN ('completed', 'failed') 
       AND completed_at < NOW() - (older_than_hours || ' hours')::INTERVAL;
     
@@ -144,7 +144,7 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- Create a view for job statistics
-CREATE VIEW job_stats AS
+CREATE VIEW workalot_job_stats AS
 SELECT 
     COUNT(*) as total,
     COUNT(*) FILTER (WHERE status = 'pending') as pending,
@@ -152,7 +152,7 @@ SELECT
     COUNT(*) FILTER (WHERE status = 'completed') as completed,
     COUNT(*) FILTER (WHERE status = 'failed') as failed,
     MIN(requested_at) FILTER (WHERE status = 'pending') as oldest_pending
-FROM jobs;
+FROM workalot_jobs;
 
 -- Create notification triggers for job status changes
 CREATE OR REPLACE FUNCTION notify_job_status_change()
@@ -183,7 +183,7 @@ $$ LANGUAGE plpgsql;
 
 -- Triggers for notifications
 CREATE TRIGGER job_status_change_notify
-    AFTER INSERT OR UPDATE ON jobs
+    AFTER INSERT OR UPDATE ON workalot_jobs
     FOR EACH ROW
     EXECUTE FUNCTION notify_job_status_change();
 
@@ -196,4 +196,4 @@ CREATE TABLE schema_migrations (
 
 -- Insert initial migration record
 INSERT INTO schema_migrations (version, description) 
-VALUES (1, 'Initial schema with jobs table, indexes, and functions');
+VALUES (1, 'Initial schema with workalot_jobs table, indexes, and functions');

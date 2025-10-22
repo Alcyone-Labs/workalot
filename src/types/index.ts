@@ -17,13 +17,14 @@ export interface JobPayload {
   jobFile: string | PathLike;
   jobPayload: Record<string, any>;
   jobTimeout?: number; // Default to 5000ms execution time
+  metaEnvelope?: MetaEnvelope; // Optional meta envelope for workflow context
 }
 
 /**
  * Job scheduling request for jobs to schedule other jobs
  */
 export interface JobSchedulingRequest {
-  type: 'scheduleAndWait' | 'schedule';
+  type: "scheduleAndWait" | "schedule";
   jobPayload: JobPayload;
   requestId: string;
 }
@@ -39,6 +40,23 @@ export interface BaseJobExecutionContext {
 }
 
 /**
+ * Meta envelope for passing structured data between workflow steps
+ */
+export interface MetaEnvelope {
+  workflowId?: string;
+  stepNumber?: number;
+  sequenceNo?: number;
+  previousResults?: Array<{
+    step: string;
+    timestamp: string;
+    success: boolean;
+    [key: string]: any;
+  }>;
+  metadata?: Record<string, any>;
+  [key: string]: any;
+}
+
+/**
  * Enhanced job execution context with scheduling capabilities
  */
 export interface JobExecutionContext extends BaseJobExecutionContext {
@@ -48,6 +66,9 @@ export interface JobExecutionContext extends BaseJobExecutionContext {
 
   // Internal - accumulated scheduling requests
   _schedulingRequests: JobSchedulingRequest[];
+
+  // Optional meta envelope for passing structured data between steps
+  metaEnvelope?: MetaEnvelope;
 }
 
 /**
@@ -87,8 +108,14 @@ export interface QueueConfig {
   jobRecoveryEnabled?: boolean; // Enable/disable job recovery service
 
   // Database backend configuration
-  backend?: 'memory' | 'pglite' | 'postgresql' | 'sqlite';
-  databaseUrl?: string; // For PGLite/PostgreSQL/SQLite backends
+  backend?: "memory" | "pglite" | "postgresql" | "sqlite" | "redis";
+  databaseUrl?: string; // For PGLite/PostgreSQL/SQLite/Redis backends
+
+  // TimescaleDB configuration (only applies when backend is 'postgresql')
+  enableTimescaleDB?: boolean; // Enable TimescaleDB-specific features
+  chunkTimeInterval?: string; // Time interval for hypertable chunks (e.g., '1 hour')
+  compressionInterval?: string; // Compress chunks older than this interval (e.g., '7 days')
+  retentionInterval?: string; // Drop data older than this interval (e.g., '90 days')
 
   // Worker configuration
   silent?: boolean; // Suppress worker console output for benchmarks
@@ -113,7 +140,7 @@ export interface IJob {
    */
   run(
     payload: Record<string, any>,
-    context: JobExecutionContext,
+    context: JobExecutionContext
   ): Promise<Record<string, any>> | Record<string, any>;
 }
 
@@ -136,6 +163,8 @@ export enum WorkerMessageType {
   JOB_ACK = "job_ack",
   QUEUE_STATUS = "queue_status",
   QUEUE_RESULT = "queue_result",
+  // Channel messaging for hierarchical routing
+  CHANNEL = "channel",
 }
 
 /**
@@ -146,6 +175,19 @@ export interface WorkerMessage {
   id?: string;
   payload?: any;
   error?: string;
+}
+
+/**
+ * Channel message structure for hierarchical routing
+ */
+/**
+ * Channel message structure for hierarchical routing
+ */
+export interface ChannelMessage {
+  type: string;
+  subChannel?: string;
+  action: string;
+  payload?: any;
 }
 
 /**

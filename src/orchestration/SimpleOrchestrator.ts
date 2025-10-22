@@ -394,6 +394,31 @@ export class SimpleOrchestrator extends EventEmitter {
   }
 
   /**
+   * Register a channel route
+   */
+  registerChannelRoute(route: any): void {
+    this.wsServer.registerChannelRoute(route);
+  }
+
+  /**
+   * Register a structured route
+   */
+  registerStructuredRoute(
+    predicate: (message: any) => boolean,
+    handler: (connection: any, message: any) => Promise<void> | void,
+    priority?: number,
+  ): void {
+    this.wsServer.registerStructuredRoute(predicate, handler, priority);
+  }
+
+  /**
+   * Send a channel message to a specific worker
+   */
+  sendChannelToWorker(workerId: number, message: any): boolean {
+    return this.wsServer.sendChannelToWorker(workerId, message);
+  }
+
+  /**
    * Check if orchestrator is running
    */
   isActive(): boolean {

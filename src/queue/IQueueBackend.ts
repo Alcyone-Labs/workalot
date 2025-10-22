@@ -31,7 +31,11 @@ export abstract class IQueueBackend extends EventEmitter {
       backend: config.backend || 'memory',
       databaseUrl: config.databaseUrl || '',
       silent: config.silent || false,
-      jobRecoveryEnabled: config.jobRecoveryEnabled !== false // Default to true
+      jobRecoveryEnabled: config.jobRecoveryEnabled !== false, // Default to true
+      enableTimescaleDB: config.enableTimescaleDB || false,
+      chunkTimeInterval: config.chunkTimeInterval || '1 hour',
+      compressionInterval: config.compressionInterval || '7 days',
+      retentionInterval: config.retentionInterval || '90 days'
     };
   }
 

@@ -5,14 +5,16 @@ A high-performance, flexible job queue system for Node.js with multiple backend 
 ## Key Features
 
 - 🚀 **High Performance**: Linear scaling with worker count, optimized for throughput
-- 🔄 **Multiple Backends**: Memory, SQLite, PGLite, and PostgreSQL options
+- 🔄 **Multiple Backends**: Memory, SQLite, PGLite, PostgreSQL, and Redis options
 - 🌐 **WebSocket Architecture**: Distributed worker support with real-time communication
+- 📡 **Channel Routing**: Hierarchical WebSocket messaging with `{type, subChannel?, action, payload}` semantics
 - 🎯 **Simple API**: Easy-to-use functions with progressive complexity options
 - 🏗️ **Extensible Design**: Build custom workers and orchestrators
 - 💾 **Flexible Persistence**: Choose the right backend for your needs
 - 🔧 **TypeScript First**: Full type safety with excellent IDE support
 - 🏭 **Factory Pattern**: Better testability and multiple instance support
 - 🛡️ **Fault Tolerant**: Automatic job recovery and error handling
+- 📋 **Workflow Support**: Meta envelope for passing structured data between job steps
 
 ## Table of Contents
 
@@ -20,8 +22,13 @@ A high-performance, flexible job queue system for Node.js with multiple backend 
 - [Installation](#installation)
 - [Architecture Overview](#architecture-overview)
 - [API Documentation](#api-documentation)
+  - [WebSocket Distributed Workers](#websocket-distributed-workers)
+  - [Channel Routing](#channel-routing)
+  - [Structured Message Routing](#structured-message-routing)
 - [Queue Backends](#queue-backends)
+  - [TimescaleDB Support](#timescaledb-support)
 - [Creating Jobs](#creating-jobs)
+  - [Workflow Jobs with Meta Envelope](#workflow-jobs-with-meta-envelope)
 - [Examples](#examples)
 - [Migration Guide](#migration-guide)
 - [Best Practices](#best-practices)
@@ -64,10 +71,13 @@ Depending on your chosen backend, you may need additional dependencies:
 npm install better-sqlite3
 
 # For PostgreSQL backend
-npm install pg
+npm install postgres
 
 # For PGLite backend (WebAssembly PostgreSQL)
 npm install @electric-sql/pglite
+
+# For Redis backend
+npm install ioredis
 ```
 
 **Note**: If using Bun runtime, SQLite is built-in and doesn't require additional dependencies.
@@ -93,7 +103,7 @@ Workalot uses a modern WebSocket-based architecture that enables:
 │   (WebSocket)   │    (WebSocket Clients)         │
 ├─────────────────┴───────────────────────────────┤
 │              Queue Backend                       │
-│   (Memory/SQLite/PGLite/PostgreSQL)             │
+│   (Memory/SQLite/PGLite/PostgreSQL/Redis)       │
 └─────────────────────────────────────────────────┘
 ```
 
@@ -144,7 +154,7 @@ const prodManager = await prodFactory.create("main");
 
 // Production with PostgreSQL
 const pgFactory = TaskManagerFactoryPresets.productionPostgreSQL(
-  "postgresql://user:pass@localhost/db",
+  "postgresql://user:pass@localhost/db"
 );
 const pgManager = await pgFactory.create("main");
 ```
@@ -225,7 +235,7 @@ whenFreeWith(manager, () => {
 
 ```typescript
 interface QueueConfig {
-  backend?: "memory" | "sqlite" | "pglite" | "postgresql";
+  backend?: "memory" | "sqlite" | "pglite" | "postgresql" | "redis";
   databaseUrl?: string;
   maxThreads?: number;
   persistenceFile?: string;
@@ -238,7 +248,11 @@ interface QueueConfig {
 
 ## Queue Backends
 
-Workalot provides four backend options, each optimized for different use cases:
+Workalot provides five backend options, each optimized for different use cases:
+
+### TimescaleDB Support
+
+Workalot also provides specialized support for TimescaleDB, enabling optimized time-series job processing with automatic compression and retention policies. See [TimescaleDB Integration](./docs/README-TimescaleDB.md) for detailed documentation.
 
 ### 1. Memory Backend
 
@@ -352,6 +366,7 @@ const manager = await createTaskManager("test", {
 - 🔒 Row-level locking
 - 📊 Advanced monitoring
 - 🔄 Point-in-time recovery
+- ⏱️ TimescaleDB integration for time-series optimization
 
 **Weaknesses**:
 
@@ -373,33 +388,106 @@ const manager = await createTaskManager("enterprise", {
     enablePartitioning: true, // Table partitioning
     ssl: { rejectUnauthorized: true },
   },
+  enableTimescaleDB: true, // Enable TimescaleDB features
+  chunkTimeInterval: "1 hour", // Hypertable chunk size
+  compressionInterval: "7 days", // Compress old chunks
+  retentionInterval: "90 days", // Drop very old data
 });
 ```
 
-**Best For**: Production systems, distributed applications, high-availability requirements
+**Best For**: Production systems, distributed applications, high-availability requirements, time-series job processing
+
+**TimescaleDB Integration**: When `enableTimescaleDB` is set to `true`, Workalot automatically converts the job queue table to a TimescaleDB hypertable with compression and retention policies. This provides 70-90% storage reduction for historical job data and optimized time-series queries. See [TimescaleDB Integration](./docs/README-TimescaleDB.md) for detailed documentation.
+
+### 5. Redis Backend
+
+**Purpose**: Ultra-high-performance distributed queue with atomic operations
+
+**Strengths**:
+
+- ⚡ Blazing fast (10,000-50,000 jobs/sec)
+- 🔒 Atomic operations via Lua scripts
+- 🌐 Horizontal scalability (Redis Cluster)
+- 📡 Pub/Sub for real-time notifications
+- 🔄 Connection pooling
+- ☁️ Edge-compatible (Upstash, Cloudflare)
+- 🎯 Priority queue with sorted sets
+- 🧹 Auto-cleanup with TTL
+
+**Weaknesses**:
+
+- 💾 In-memory (higher costs at scale)
+- 🔧 Requires Redis server
+- 💰 Memory-based pricing
+- 🔄 Persistence trade-offs (RDB/AOF)
+
+**Configuration**:
+
+```typescript
+const manager = await createTaskManager("high-perf", {
+  backend: "redis",
+  databaseUrl: "redis://localhost:6379",
+  redisConfig: {
+    keyPrefix: "workalot",
+    completedJobTTL: 86400, // 24 hours
+    failedJobTTL: 604800, // 7 days
+    enablePubSub: true, // Real-time notifications
+  },
+});
+
+// Or with Upstash (Cloudflare-compatible)
+const edgeManager = await createTaskManager("edge", {
+  backend: "redis",
+  databaseUrl: process.env.UPSTASH_REDIS_URL,
+  redisConfig: {
+    tls: { rejectUnauthorized: false },
+  },
+});
+```
+
+**Best For**: High-throughput systems, real-time processing, distributed workers, edge computing (with Upstash), microservices
+
+**Performance**: Redis provides the highest throughput of all backends with atomic job claiming via Lua scripts (similar to PostgreSQL's FOR UPDATE SKIP LOCKED). Expected performance: 10,000-50,000 jobs/second on a single instance. See [Redis Queue Documentation](./docs/REDIS_QUEUE.md) for detailed information.
 
 ### Backend Selection Guide
 
 ```
-┌─────────────────────────────────────────────┐
-│ Do you need persistence?                    │
-│                                             │
-│  No ──► Memory Backend                      │
-│         (Development/Testing)               │
-│                                             │
-│  Yes ──► Do you need distribution?         │
-│          │                                  │
-│          │  No ──► Single machine?         │
-│          │         │                       │
-│          │         │  Yes ──► SQLite       │
-│          │         │         (Production)  │
-│          │         │                       │
-│          │         │  Testing ──► PGLite   │
-│          │                                 │
-│          │  Yes ──► PostgreSQL             │
-│                    (Enterprise)            │
-└─────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│ What's your primary requirement?                     │
+│                                                      │
+│  Development/Testing ──► Memory Backend             │
+│                          (Fastest, no persistence)  │
+│                                                      │
+│  Single Machine ──► SQLite Backend                  │
+│                    (Simple, reliable, persistent)   │
+│                                                      │
+│  High Throughput ──► Redis Backend                  │
+│                     (10k-50k jobs/sec, distributed) │
+│                                                      │
+│  Enterprise/HA ──► PostgreSQL Backend               │
+│                   (Replication, ACID, TimescaleDB)  │
+│                                                      │
+│  Edge Computing ──► Redis (Upstash) or PGLite      │
+│                    (Cloudflare Workers compatible)  │
+│                                                      │
+│  PostgreSQL Testing ──► PGLite Backend              │
+│                        (WebAssembly PostgreSQL)     │
+└──────────────────────────────────────────────────────┘
 ```
+
+### Backend Comparison Table
+
+| Feature          | Memory     | SQLite        | PGLite     | PostgreSQL      | Redis        |
+| ---------------- | ---------- | ------------- | ---------- | --------------- | ------------ |
+| **Performance**  | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐      | ⭐⭐⭐     | ⭐⭐⭐⭐        | ⭐⭐⭐⭐⭐   |
+| **Throughput**   | 100k+/s    | 10-50k/s      | 1-10k/s    | 10-50k/s        | 10-50k/s     |
+| **Persistence**  | ❌         | ✅            | ✅         | ✅              | ✅           |
+| **Distribution** | ❌         | ❌            | ❌         | ✅              | ✅           |
+| **Atomic Ops**   | ✅         | ✅            | ✅         | ✅ (FOR UPDATE) | ✅ (Lua)     |
+| **Setup**        | None       | Minimal       | Minimal    | Complex         | Medium       |
+| **Edge Deploy**  | ✅         | ✅            | ✅         | ❌              | ✅ (Upstash) |
+| **Memory Usage** | Low        | Low           | Medium     | Medium          | High         |
+| **Best For**     | Dev/Test   | Single server | PG testing | Enterprise      | High perf    |
 
 ## Creating Jobs
 
@@ -477,7 +565,7 @@ export default class RobustJob extends BaseJob implements IJob {
           payload,
           stack: error instanceof Error ? error.stack : undefined,
           timestamp: new Date().toISOString(),
-        },
+        }
       );
     }
   }
@@ -505,30 +593,107 @@ export default class CustomIdJob extends BaseJob implements IJob {
 }
 ```
 
-## Examples
+### Workflow Jobs with Meta Envelope
 
-### Basic Usage
+Jobs can pass structured data between workflow steps using the meta envelope:
 
 ```typescript
-import { createTaskManager, scheduleAndWaitWith } from "@alcyone-labs/workalot";
+import { BaseJob, IJob, JobExecutionContext } from "@alcyone-labs/workalot";
 
-// Create a task manager instance
-const manager = await createTaskManager("main", {
-  backend: "sqlite",
-  databaseUrl: "./queue.db",
-});
+export default class WorkflowStepJob extends BaseJob implements IJob {
+  async run(payload: any, context: JobExecutionContext): Promise<any> {
+    // Initialize meta envelope if not present
+    if (!context.metaEnvelope) {
+      context.metaEnvelope = {
+        workflowId: payload.workflowId || "default",
+        stepNumber: 1,
+        previousResults: [],
+        metadata: {},
+      };
+    }
 
-// Schedule and wait for a job
-const result = await scheduleAndWaitWith(manager, {
-  jobFile: "jobs/ProcessDataJob.ts",
-  jobPayload: { data: [1, 2, 3, 4, 5] },
-});
+    // Add current step result to meta envelope
+    const stepResult = {
+      step: "data-processing",
+      timestamp: new Date().toISOString(),
+      success: true,
+      data: payload,
+    };
 
-console.log("Job completed:", result);
+    context.metaEnvelope.previousResults.push(stepResult);
+    context.metaEnvelope.stepNumber++;
 
-// Clean up
-await destroyTaskManager("main");
+    // Store additional metadata
+    context.metaEnvelope.metadata = {
+      ...context.metaEnvelope.metadata,
+      lastProcessedAt: new Date().toISOString(),
+      processingTime: Date.now() - context.startTime,
+    };
+
+    return this.success({
+      message: "Step completed successfully",
+      stepResult,
+      workflowProgress: context.metaEnvelope,
+    });
+  }
+}
 ```
+
+### Accessing Workflow Context
+
+Subsequent jobs in a workflow can access the accumulated context:
+
+```typescript
+export default class ValidationJob extends BaseJob implements IJob {
+  async run(payload: any, context: JobExecutionContext): Promise<any> {
+    if (!context.metaEnvelope) {
+      throw new Error(
+        "Meta envelope not found - this job should be part of a workflow"
+      );
+    }
+
+    const workflowId = context.metaEnvelope.workflowId;
+    const stepNumber = context.metaEnvelope.stepNumber;
+    const previousResults = context.metaEnvelope.previousResults;
+
+    console.log(`Processing step ${stepNumber} of workflow ${workflowId}`);
+    console.log(`Previous results: ${previousResults.length} steps completed`);
+
+    // Add current step to the envelope
+    const currentStep = {
+      step: "validation",
+      timestamp: new Date().toISOString(),
+      success: true,
+      validationResults: payload,
+    };
+
+    context.metaEnvelope.previousResults.push(currentStep);
+    context.metaEnvelope.stepNumber++;
+
+    return this.success({
+      workflowId,
+      stepNumber,
+      currentStep,
+      totalSteps: context.metaEnvelope.previousResults.length,
+    });
+  }
+}
+```
+
+## Examples
+
+Workalot provides several examples to help you get started:
+
+- [Basic Usage](./examples/basic-usage.ts) - Simple job processing with different backends
+- [Quick Start](./examples/quick-start.ts) - Minimal example to get up and running quickly
+- [Basic Distributed](./examples/basic-distributed/) - Simple WebSocket-based distributed processing
+- [WebSocket Distributed](./examples/websocket-distributed/) - More advanced distributed processing
+- [Channel Routing](./examples/channel-routing-example.ts) - Hierarchical WebSocket messaging with channel routing
+- [Meta Envelope](./examples/meta-envelope-example.ts) - Workflow jobs with structured data passing
+- [TimescaleDB Integration](./examples/timescaledb-example.ts) - Time-series job processing with compression
+- [Custom Orchestration](./examples/custom-orchestration/) - Building custom orchestrators
+- [Error Handling](./examples/error-handling.ts) - Proper error handling in jobs
+- [Factory Pattern](./examples/factory-pattern.ts) - Using the factory pattern for better testability
 
 ### High-Throughput Processing
 
@@ -607,7 +772,7 @@ class CustomWorker extends SimpleWorker {
       case WorkerMessageType.EXECUTE_JOB:
         await this.executeCustomJob(message.payload as JobPayload);
         break;
-      
+
       default:
         await super.handleMessage(message);
         break;
@@ -619,6 +784,49 @@ class CustomWorker extends SimpleWorker {
     // Send results back to orchestrator using this.wsClient.send()
   }
 }
+```
+
+#### Channel Routing
+
+Workalot supports hierarchical WebSocket messaging for complex workflows:
+
+```typescript
+import { WebSocketServer, ChannelMessage } from "@alcyone-labs/workalot";
+
+// Send structured channel messages
+server.sendChannelToWorker(workerId, {
+  type: "data-processing",
+  subChannel: "workflow",
+  action: "step-complete",
+  payload: { stepId: "transform", result: "success" },
+});
+
+// Register channel route handlers
+server.registerChannelRoute({
+  handler: (connection, message) => {
+    console.log(`Received ${message.action} for ${message.type}`);
+    // Handle workflow step completion
+  },
+});
+```
+
+#### Structured Message Routing
+
+Register custom message filters beyond simple type matching:
+
+```typescript
+import { WorkerMessageType } from "@alcyone-labs/workalot";
+
+// Register custom message filters
+server.registerStructuredRoute(
+  (message) =>
+    message.type === WorkerMessageType.JOB_RESULT &&
+    message.payload?.success === false,
+  (connection, message) => {
+    console.log("Handling failed job:", message.payload);
+    // Custom logic for failed jobs
+  }
+);
 ```
 
 See `examples/basic-distributed/` for a complete working example.
@@ -778,6 +986,14 @@ const result = await scheduleAndWaitWith(manager, {
 - Use in-memory backends for speed
 - Clean up resources properly
 
+### 6. Advanced Features
+
+- **Channel Routing**: Use for complex workflows requiring hierarchical messaging
+- **Structured Routing**: Implement custom message filters for specialized processing
+- **Meta Envelope**: Use for workflow jobs that need to pass structured data between steps
+- **Workflow Design**: Keep workflow steps idempotent and handle failures gracefully
+- **Message Patterns**: Design clear message schemas for channel-based communication
+
 ## Performance Benchmarks
 
 | Backend    | Throughput (jobs/sec) | Latency (ms) | Persistence | Scalability    |
@@ -788,6 +1004,8 @@ const result = await scheduleAndWaitWith(manager, {
 | PostgreSQL | 5,000-50,000          | 2-10         | Yes         | Multi-Machine  |
 
 _Benchmarks performed on MacBook Pro M1 with 8 workers_
+
+**TimescaleDB**: When using the PostgreSQL backend with TimescaleDB features enabled, job processing performance remains similar to regular PostgreSQL, but storage requirements are reduced by 70-90% for historical job data through automatic compression.
 
 ## Requirements
 
@@ -818,6 +1036,9 @@ We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for gu
 - ✅ Factory pattern support
 - ✅ Simplified components
 - ✅ Multiple backend options
+- ✅ Channel routing for hierarchical messaging
+- ✅ Structured message routing
+- ✅ Workflow support with meta envelope
 
 ### Upcoming (v2.x)
 
@@ -826,6 +1047,8 @@ We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for gu
 - 🔄 Priority queues
 - 🔄 Scheduled jobs
 - 🔄 Job dependencies
+- 🔄 Advanced workflow orchestration
+- 🔄 Job batching and streaming
 
 ### Future (v3.0)
 
