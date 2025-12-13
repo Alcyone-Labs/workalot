@@ -75,7 +75,7 @@
   "dependencies": {
     "@elysiajs/cors": "^1.4.0",
     "@elysiajs/static": "^1.4.4",
-    "elysia": "^1.4.6",
+    "elysia": "^1.4.17",
     "ioredis": "^5.8.2",
     "postgres": "^3.4.7",
     "ulidx": "^2.4.1"
