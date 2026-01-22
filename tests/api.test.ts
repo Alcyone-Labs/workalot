@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { unlink } from "fs/promises";
 import {
   TaskManager,
   TaskManagerSingleton,
@@ -14,16 +13,10 @@ import {
   isInitialized,
 } from "../src/api/index.ts";
 import { JobPayload } from "../src/types/index.ts";
+import { getTempTsonFile } from "./test-utils.js";
 
 describe("API Layer", () => {
   let testPersistenceFile: string;
-
-  beforeEach(async () => {
-    testPersistenceFile = `test-api-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.tson`;
-
-    // Reset singleton for clean tests
-    TaskManagerSingleton.reset();
-  });
 
   afterEach(async () => {
     try {
@@ -31,20 +24,17 @@ describe("API Layer", () => {
     } catch (error) {
       // Ignore shutdown errors in tests
     }
-
-    // Clean up test persistence file
-    try {
-      await unlink(testPersistenceFile);
-    } catch (error) {
-      // File might not exist, ignore
-    }
   });
 
   describe("TaskManager Class", () => {
     let taskManager: TaskManager;
 
     beforeEach(async () => {
+      testPersistenceFile = getTempTsonFile('api');
+
       taskManager = new TaskManager({
+        backend: "pglite",
+        databaseUrl: "memory://",
         persistenceFile: testPersistenceFile,
         maxThreads: 2,
         maxInMemoryAge: 1000,
@@ -83,7 +73,7 @@ describe("API Layer", () => {
       // Test that scheduleAndWait waits for the correct job even with multiple jobs
       const startTime = Date.now();
 
-      const promises = [];
+      const promises: Promise<{ jobId: string; completedAt: number }>[] = [];
       for (let i = 1; i <= 3; i++) {
         const promise = taskManager.scheduleAndWait({
           jobFile: "./tests/fixtures/TimedJob.ts",
@@ -254,10 +244,9 @@ describe("API Layer", () => {
       expect(isInitialized()).toBe(false);
 
       await initializeTaskManager({
-        persistenceFile: testPersistenceFile,
+        backend: "pglite",
+        databaseUrl: "memory://",
         maxThreads: 2,
-        maxInMemoryAge: 1000,
-        healthCheckInterval: 100,
       });
 
       expect(isInitialized()).toBe(true);
@@ -265,6 +254,8 @@ describe("API Layer", () => {
 
     it("should execute jobs with scheduleAndWait function", async () => {
       await initializeTaskManager({
+        backend: "pglite",
+        databaseUrl: "memory://",
         persistenceFile: testPersistenceFile,
         maxThreads: 2,
       });
@@ -283,6 +274,8 @@ describe("API Layer", () => {
 
     it("should handle whenFree function", async () => {
       await initializeTaskManager({
+        backend: "pglite",
+        databaseUrl: "memory://",
         persistenceFile: testPersistenceFile,
         maxThreads: 2,
       });
@@ -300,6 +293,8 @@ describe("API Layer", () => {
 
     it("should schedule jobs without waiting using function", async () => {
       await initializeTaskManager({
+        backend: "pglite",
+        databaseUrl: "memory://",
         persistenceFile: testPersistenceFile,
         maxThreads: 2,
       });
@@ -317,6 +312,8 @@ describe("API Layer", () => {
 
     it("should provide status through functions", async () => {
       await initializeTaskManager({
+        backend: "pglite",
+        databaseUrl: "memory://",
         persistenceFile: testPersistenceFile,
         maxThreads: 2,
       });
@@ -331,6 +328,8 @@ describe("API Layer", () => {
 
     it("should handle multiple whenFree callbacks", async () => {
       await initializeTaskManager({
+        backend: "pglite",
+        databaseUrl: "memory://",
         persistenceFile: testPersistenceFile,
         maxThreads: 2,
       });
@@ -352,6 +351,8 @@ describe("API Layer", () => {
 
     it("should remove whenFree callbacks using function", async () => {
       await initializeTaskManager({
+        backend: "pglite",
+        databaseUrl: "memory://",
         persistenceFile: testPersistenceFile,
         maxThreads: 2,
       });

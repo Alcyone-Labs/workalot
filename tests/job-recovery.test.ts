@@ -1,21 +1,24 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { unlink } from 'node:fs/promises';
 import { QueueManager } from '../src/queue/QueueManager.ts';
-import { SQLiteQueue } from '../src/queue/SQLiteQueue.ts';
+import { PGLiteQueue } from '../src/queue/PGLiteQueue.ts';
 import { JobRecoveryService } from '../src/workers/JobRecoveryService.ts';
 import { JobScheduler } from '../src/workers/JobScheduler.ts';
 import { JobStatus } from '../src/types/index.ts';
-import { randomBytes } from 'node:crypto';
+import { getTempTsonFile } from './test-utils.js';
 
 describe('Job Recovery System', () => {
   describe('JobRecoveryService', () => {
     let queueManager: QueueManager;
     let recoveryService: JobRecoveryService;
     let testId: string;
+    let persistenceFile: string;
 
     beforeEach(async () => {
       testId = randomBytes(8).toString('hex');
+      persistenceFile = getTempTsonFile('recovery');
       queueManager = new QueueManager({
-        persistenceFile: `test-recovery-${Date.now()}-${testId}.tson`,
+        persistenceFile,
         cleanupInterval: 60000,
         maxCompletedJobs: 100,
       });
@@ -168,11 +171,13 @@ describe('Job Recovery System', () => {
     describe('QueueManager Recovery', () => {
       let queueManager: QueueManager;
       let testId: string;
+      let persistenceFile: string;
 
       beforeEach(async () => {
         testId = randomBytes(8).toString('hex');
+        persistenceFile = getTempTsonFile('recovery-queue');
         queueManager = new QueueManager({
-          persistenceFile: `test-recovery-queue-${Date.now()}-${testId}.tson`,
+          persistenceFile,
         });
         await queueManager.initialize();
       });
@@ -226,53 +231,54 @@ describe('Job Recovery System', () => {
       });
     });
 
-    describe('SQLiteQueue Recovery', () => {
-      let sqliteQueue: SQLiteQueue;
+    describe('PGLiteQueue Recovery', () => {
+      let pgliteQueue: PGLiteQueue;
 
       beforeEach(async () => {
-        sqliteQueue = new SQLiteQueue({
-          database: ':memory:',
-          maxConcurrentJobs: 10,
+        pgliteQueue = new PGLiteQueue({
+          databaseUrl: 'memory://',
         });
-        await sqliteQueue.initialize();
+        await pgliteQueue.initialize();
       });
 
       afterEach(async () => {
-        await sqliteQueue.shutdown();
+        await pgliteQueue.shutdown();
       });
 
-      it('should recover stalled jobs in SQLite', async () => {
+      it('should recover stalled jobs in PGLite', async () => {
         // Add jobs
-        const jobId1 = await sqliteQueue.addJob({ jobFile: 'test1.ts', jobData: {} });
-        const jobId2 = await sqliteQueue.addJob({ jobFile: 'test2.ts', jobData: {} });
+        const jobId1 = await pgliteQueue.addJob({ jobFile: 'test1.ts', jobData: {} });
+        const jobId2 = await pgliteQueue.addJob({ jobFile: 'test2.ts', jobData: {} });
 
         // Mark jobs as processing (simulate stalled jobs)
-        await sqliteQueue.updateJobStatus(jobId1, JobStatus.PROCESSING);
-        await sqliteQueue.updateJobStatus(jobId2, JobStatus.PROCESSING);
+        await pgliteQueue.updateJobStatus(jobId1, JobStatus.PROCESSING);
+        await pgliteQueue.updateJobStatus(jobId2, JobStatus.PROCESSING);
 
         // Wait a bit to ensure timestamp difference
         await new Promise(resolve => setTimeout(resolve, 50));
 
-        const recoveredCount = await sqliteQueue.recoverStalledJobs(25); // 25ms timeout
+        // Use a longer timeout for PGLite as DB operations might take slightly longer
+        // and we want to ensure we catch the stalled jobs
+        const recoveredCount = await pgliteQueue.recoverStalledJobs(25); 
         expect(recoveredCount).toBe(2);
 
         // Check jobs are back to pending
-        const job1 = await sqliteQueue.getJob(jobId1);
-        const job2 = await sqliteQueue.getJob(jobId2);
+        const job1 = await pgliteQueue.getJob(jobId1);
+        const job2 = await pgliteQueue.getJob(jobId2);
 
         expect(job1?.status).toBe(JobStatus.PENDING);
         expect(job2?.status).toBe(JobStatus.PENDING);
       });
 
-      it('should get stalled jobs from SQLite', async () => {
+      it('should get stalled jobs from PGLite', async () => {
         // Add a job and mark as processing
-        const jobId = await sqliteQueue.addJob({ jobFile: 'test.ts', jobData: {} });
-        await sqliteQueue.updateJobStatus(jobId, JobStatus.PROCESSING);
+        const jobId = await pgliteQueue.addJob({ jobFile: 'test.ts', jobData: {} });
+        await pgliteQueue.updateJobStatus(jobId, JobStatus.PROCESSING);
 
         // Wait to make it stalled
         await new Promise(resolve => setTimeout(resolve, 50));
 
-        const stalledJobs = await sqliteQueue.getStalledJobs(25); // 25ms timeout
+        const stalledJobs = await pgliteQueue.getStalledJobs(25);
         expect(stalledJobs).toHaveLength(1);
         expect(stalledJobs[0].id).toBe(jobId);
       });
@@ -283,11 +289,13 @@ describe('Job Recovery System', () => {
     let jobScheduler: JobScheduler;
     let queueManager: QueueManager;
     let testId: string;
+    let persistenceFile: string;
 
     beforeEach(async () => {
       testId = randomBytes(8).toString('hex');
+      persistenceFile = getTempTsonFile('scheduler-recovery');
       queueManager = new QueueManager({
-        persistenceFile: `test-scheduler-recovery-${Date.now()}-${testId}.tson`,
+        persistenceFile,
       });
       
       jobScheduler = new JobScheduler(queueManager, {

@@ -5,6 +5,9 @@ import { fileURLToPath } from 'node:url';
 import { ulid } from 'ulidx';
 import { QueueItem, JobStatus, JobPayload, JobResult, QueueConfig } from '../types/index.js';
 import { IQueueBackend, QueueStats } from './IQueueBackend.js';
+import { trace, SpanStatusCode, Span } from '@opentelemetry/api';
+
+const tracer = trace.getTracer('workalot-queue');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -168,25 +171,42 @@ export class PGLiteQueue extends IQueueBackend {
   }
 
   async addJob(jobPayload: JobPayload, customId?: string): Promise<string> {
-    if (this.isShuttingDown) {
-      throw new Error('Queue is shutting down, cannot add new jobs');
-    }
+    return tracer.startActiveSpan('PGLiteQueue.addJob', async (span) => {
+      if (this.isShuttingDown) {
+        span.recordException(new Error('Queue is shutting down'));
+        span.setStatus({ code: SpanStatusCode.ERROR, message: 'Queue is shutting down' });
+        span.end();
+        throw new Error('Queue is shutting down, cannot add new jobs');
+      }
 
-    const id = customId || this.generateJobId();
+      const id = customId || this.generateJobId();
+      span.setAttribute('job.id', id);
 
-    return this.executeQueued(async () => {
       try {
-        await this.db!.query(`
-          INSERT INTO jobs (id, job_payload, status, requested_at)
-          VALUES ($1, $2, $3, NOW())
-        `, [id, jobPayload, JobStatus.PENDING]);
+        const result = await this.executeQueued(async () => {
+          try {
+            await this.db!.query(`
+              INSERT INTO workalot_jobs (id, job_payload, status, requested_at)
+              VALUES ($1, $2, $3, NOW())
+            `, [id, jobPayload, JobStatus.PENDING]);
 
-        return id;
+            return id;
+          } catch (error) {
+            if (error instanceof Error && error.message.includes('duplicate key')) {
+              throw new Error(`Job with ID ${id} already exists in queue`);
+            }
+            throw new Error(`Failed to add job: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        });
+        
+        span.setStatus({ code: SpanStatusCode.OK });
+        return result;
       } catch (error) {
-        if (error instanceof Error && error.message.includes('duplicate key')) {
-          throw new Error(`Job with ID ${id} already exists in queue`);
-        }
-        throw new Error(`Failed to add job: ${error instanceof Error ? error.message : String(error)}`);
+        span.recordException(error as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
+        throw error;
+      } finally {
+        span.end();
       }
     });
   }
@@ -199,7 +219,7 @@ export class PGLiteQueue extends IQueueBackend {
         const result = await this.db!.query(`
           SELECT id, job_payload, status, requested_at, started_at, completed_at,
                  last_updated, worker_id, result, error_message, error_stack
-          FROM jobs 
+          FROM workalot_jobs 
           WHERE id = $1
         `, [id]);
 
@@ -221,84 +241,118 @@ export class PGLiteQueue extends IQueueBackend {
     error?: Error,
     workerId?: number
   ): Promise<boolean> {
-    return this.executeQueued(async () => {
-      const updateFields: string[] = ['status = $2', 'last_updated = NOW()'];
-      const params: any[] = [id, status];
-      let paramIndex = 3;
-
-      if (status === JobStatus.PROCESSING && workerId !== undefined) {
-        updateFields.push(`worker_id = $${paramIndex++}`);
-        updateFields.push(`started_at = NOW()`);
-        params.push(workerId);
-      }
-
-      if (status === JobStatus.COMPLETED || status === JobStatus.FAILED) {
-        updateFields.push(`completed_at = NOW()`);
-
-        if (result !== undefined) {
-          updateFields.push(`result = $${paramIndex++}`);
-          params.push(JSON.stringify(result));
-        }
-
-        if (error) {
-          updateFields.push(`error_message = $${paramIndex++}`);
-          updateFields.push(`error_stack = $${paramIndex++}`);
-          params.push(error.message);
-          params.push(error.stack || '');
-        }
-      }
-
-      const query = `UPDATE jobs SET ${updateFields.join(', ')} WHERE id = $1`;
-      if (this.config.debug) {
-        console.log(`[PGLite DEBUG] Executing updateJobStatus query for job ${id}:`, query);
-        console.log(`[PGLite DEBUG] Parameters:`, params);
-      }
+    return tracer.startActiveSpan('PGLiteQueue.updateJobStatus', async (span) => {
+      span.setAttribute('job.id', id);
+      span.setAttribute('job.status', status);
+      if (workerId) span.setAttribute('worker.id', workerId);
 
       try {
-        const updateResult = await this.executeWithRetry(
-          () => this.db!.query(query, params),
-          `updateJobStatus for job ${id}`
-        );
+        const opResult = await this.executeQueued(async () => {
+          const updateFields: string[] = ['status = $2', 'last_updated = NOW()'];
+          const params: any[] = [id, status];
+          let paramIndex = 3;
 
-        if (this.config.debug) {
-          console.log(`[PGLite DEBUG] Update result for job ${id}:`, updateResult);
-        }
+          if (status === JobStatus.PROCESSING) {
+            updateFields.push(`started_at = NOW()`);
+            if (workerId !== undefined) {
+              updateFields.push(`worker_id = $${paramIndex++}`);
+              params.push(workerId);
+            }
+          }
 
-        return ((updateResult as any).affectedRows || 0) > 0;
-      } catch (error) {
-        console.error(`[PGLite ERROR] Failed to update job ${id} status:`, error);
-        console.error(`[PGLite ERROR] Query was:`, query);
-        console.error(`[PGLite ERROR] Parameters were:`, params);
-        console.error(`[PGLite ERROR] Error stack:`, error instanceof Error ? error.stack : 'No stack trace');
-        throw new Error(`Failed to update job status: ${error instanceof Error ? error.message : String(error)}`);
+          if (status === JobStatus.COMPLETED || status === JobStatus.FAILED) {
+            updateFields.push(`completed_at = NOW()`);
+
+            if (result !== undefined) {
+              updateFields.push(`result = $${paramIndex++}`);
+              params.push(JSON.stringify(result));
+            }
+
+            if (error) {
+              updateFields.push(`error_message = $${paramIndex++}`);
+              updateFields.push(`error_stack = $${paramIndex++}`);
+              params.push(error.message);
+              params.push(error.stack || '');
+            }
+          }
+
+          const query = `UPDATE workalot_jobs SET ${updateFields.join(', ')} WHERE id = $1`;
+          if (this.config.debug) {
+            console.log(`[PGLite DEBUG] Executing updateJobStatus query for job ${id}:`, query);
+            console.log(`[PGLite DEBUG] Parameters:`, params);
+          }
+
+          try {
+            const updateResult = await this.executeWithRetry(
+              () => this.db!.query(query, params),
+              `updateJobStatus for job ${id}`
+            );
+
+            if (this.config.debug) {
+              console.log(`[PGLite DEBUG] Update result for job ${id}:`, updateResult);
+            }
+
+            return ((updateResult as any).affectedRows || 0) > 0;
+          } catch (error) {
+            console.error(`[PGLite ERROR] Failed to update job ${id} status:`, error);
+            console.error(`[PGLite ERROR] Query was:`, query);
+            console.error(`[PGLite ERROR] Parameters were:`, params);
+            console.error(`[PGLite ERROR] Error stack:`, error instanceof Error ? error.stack : 'No stack trace');
+            throw new Error(`Failed to update job status: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        });
+        span.setStatus({ code: SpanStatusCode.OK });
+        return opResult;
+      } catch (err) {
+        span.recordException(err as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error).message });
+        throw err;
+      } finally {
+        span.end();
       }
     });
   }
 
   async getNextPendingJob(): Promise<QueueItem | undefined> {
-    return this.executeQueued(async () => {
+    return tracer.startActiveSpan('PGLiteQueue.getNextPendingJob', async (span) => {
       try {
-        // Use the stored function for atomic job claiming with row locking
-        const result = await this.db!.query(`
-          SELECT * FROM get_next_pending_job($1)
-        `, [null]); // We'll add worker ID support later
+        const result = await this.executeQueued(async () => {
+          try {
+            // Use the stored function for atomic job claiming with row locking
+            const result = await this.db!.query(`
+              SELECT * FROM get_next_pending_job($1)
+            `, [null]); // We'll add worker ID support later
 
-        if (result.rows.length === 0) {
-          return undefined;
-        }
+            if (result.rows.length === 0) {
+              return undefined;
+            }
 
-        const row = result.rows[0] as any;
-        return {
-          id: row.id,
-          jobPayload: typeof row.job_payload === 'string' ? JSON.parse(row.job_payload) : row.job_payload,
-          status: row.status as JobStatus,
-          requestedAt: new Date(row.requested_at),
-          startedAt: new Date(), // Just started
-          lastUpdated: new Date(),
-          workerId: undefined, // Will be set by the caller
-        };
+            const row = result.rows[0] as any;
+            const job = {
+              id: row.id,
+              jobPayload: typeof row.job_payload === 'string' ? JSON.parse(row.job_payload) : row.job_payload,
+              status: row.status as JobStatus,
+              requestedAt: new Date(row.requested_at),
+              startedAt: new Date(), // Just started
+              lastUpdated: new Date(),
+              workerId: undefined, // Will be set by the caller
+            };
+            
+            span.setAttribute('job.id', job.id);
+            return job;
+          } catch (error) {
+            throw new Error(`Failed to get next pending job: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        });
+        
+        span.setStatus({ code: SpanStatusCode.OK });
+        return result;
       } catch (error) {
-        throw new Error(`Failed to get next pending job: ${error instanceof Error ? error.message : String(error)}`);
+        span.recordException(error as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
+        throw error;
+      } finally {
+        span.end();
       }
     });
   }
@@ -314,10 +368,10 @@ export class PGLiteQueue extends IQueueBackend {
         // Use a more efficient batch query to reduce database operations
         const result = await this.executeWithRetry(
           () => this.db!.query(`
-            UPDATE jobs
+            UPDATE workalot_jobs
             SET status = 'processing', started_at = NOW(), last_updated = NOW()
             WHERE id IN (
-              SELECT id FROM jobs
+              SELECT id FROM workalot_jobs
               WHERE status = 'pending'
                 AND (scheduled_for IS NULL OR scheduled_for <= NOW())
               ORDER BY priority DESC, requested_at ASC
@@ -346,7 +400,7 @@ export class PGLiteQueue extends IQueueBackend {
         const result = await this.db!.query(`
           SELECT id, job_payload, status, requested_at, started_at, completed_at,
                  last_updated, worker_id, result, error_message, error_stack
-          FROM jobs 
+          FROM workalot_jobs 
           WHERE status = $1
           ORDER BY requested_at ASC
         `, [status]);
@@ -363,7 +417,7 @@ export class PGLiteQueue extends IQueueBackend {
       this.ensureInitialized();
 
       try {
-        const result = await this.db!.query('SELECT * FROM job_stats');
+        const result = await this.db!.query('SELECT * FROM workalot_job_stats');
         const stats = result.rows[0] as any;
 
         return {
@@ -401,7 +455,7 @@ export class PGLiteQueue extends IQueueBackend {
 
       try {
         const result = await this.db!.query(`
-          SELECT EXISTS(SELECT 1 FROM jobs WHERE status = $1) as has_pending
+          SELECT EXISTS(SELECT 1 FROM workalot_jobs WHERE status = $1) as has_pending
         `, [JobStatus.PENDING]);
 
         return (result.rows[0] as any).has_pending;
@@ -417,7 +471,7 @@ export class PGLiteQueue extends IQueueBackend {
 
       try {
         const result = await this.db!.query(`
-          SELECT EXISTS(SELECT 1 FROM jobs WHERE status = $1) as has_processing
+          SELECT EXISTS(SELECT 1 FROM workalot_jobs WHERE status = $1) as has_processing
         `, [JobStatus.PROCESSING]);
 
         return (result.rows[0] as any).has_processing;
@@ -432,7 +486,7 @@ export class PGLiteQueue extends IQueueBackend {
       this.ensureInitialized();
 
       try {
-        const result = await this.db!.query(`SELECT EXISTS(SELECT 1 FROM jobs) as has_jobs`);
+        const result = await this.db!.query(`SELECT EXISTS(SELECT 1 FROM workalot_jobs) as has_jobs`);
         return !(result.rows[0] as any).has_jobs;
       } catch (error) {
         throw new Error(`Failed to check if queue is empty: ${error instanceof Error ? error.message : String(error)}`);
@@ -447,7 +501,7 @@ export class PGLiteQueue extends IQueueBackend {
       try {
         // Use milliseconds for more precise timeout handling
         const result = await this.db!.query(`
-          UPDATE jobs
+          UPDATE workalot_jobs
           SET status = 'pending', started_at = NULL, worker_id = NULL
           WHERE status = 'processing'
             AND started_at < NOW() - INTERVAL '${stalledTimeoutMs} milliseconds'
@@ -474,7 +528,7 @@ export class PGLiteQueue extends IQueueBackend {
       try {
         // Use milliseconds for more precise timeout handling
         const result = await this.db!.query(`
-          SELECT * FROM jobs
+          SELECT * FROM workalot_jobs
           WHERE status = 'processing'
             AND started_at < NOW() - INTERVAL '${stalledTimeoutMs} milliseconds'
           ORDER BY started_at ASC
@@ -537,7 +591,20 @@ export class PGLiteQueue extends IQueueBackend {
    */
   private async executeQueued<T>(operation: () => Promise<T>): Promise<T> {
     this.ensureInitialized();
-    return this.dbOperationQueue.execute(operation);
+    // Trace the queue wait/execution time
+    return tracer.startActiveSpan('PGLiteQueue.executeQueued', async (span) => {
+      try {
+        const result = await this.dbOperationQueue.execute(operation);
+        span.setStatus({ code: SpanStatusCode.OK });
+        return result;
+      } catch (error) {
+        span.recordException(error as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
+        throw error;
+      } finally {
+        span.end();
+      }
+    });
   }
 
   private generateJobId(): string {
@@ -684,7 +751,7 @@ export class PGLiteQueue extends IQueueBackend {
             last_updated, worker_id, result, error_message, error_stack,
             retry_count, max_retries, timeout_ms, priority, scheduled_for,
             created_by, tags
-          FROM jobs
+          FROM workalot_jobs
           WHERE id = $1
         `, [id]);
 
@@ -724,7 +791,7 @@ export class PGLiteQueue extends IQueueBackend {
 
       try {
         await this.db!.query(`
-          INSERT INTO jobs (id, job_payload, status, requested_at, scheduled_for)
+          INSERT INTO workalot_jobs (id, job_payload, status, requested_at, scheduled_for)
           VALUES ($1, $2, $3, NOW(), $4)
         `, [id, jobPayload, JobStatus.PENDING, scheduledFor]);
 
@@ -749,7 +816,7 @@ export class PGLiteQueue extends IQueueBackend {
         const result = await this.db!.query(`
           SELECT id, job_payload, status, requested_at, started_at, completed_at,
                  last_updated, worker_id, result, error_message, error_stack
-          FROM jobs
+          FROM workalot_jobs
           WHERE status = $1 AND scheduled_for > NOW()
           ORDER BY scheduled_for ASC
         `, [JobStatus.PENDING]);

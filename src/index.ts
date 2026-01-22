@@ -154,3 +154,10 @@ export {
 
 // Re-export common utilities
 export { ulid } from "ulidx";
+
+// Telemetry
+export {
+  initTelemetry,
+  shutdownTelemetry,
+  type TelemetryConfig,
+} from "./telemetry.js";

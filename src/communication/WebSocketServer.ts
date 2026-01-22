@@ -5,7 +5,25 @@ import {
   WorkerMessageType,
   type ChannelMessage,
 } from "../types/index.js";
+
 import { ulid } from "ulidx";
+import { opentelemetry } from '@elysiajs/opentelemetry';
+import { trace, metrics, SpanStatusCode } from '@opentelemetry/api';
+
+const tracer = trace.getTracer('workalot-ws');
+const meter = metrics.getMeter('workalot-ws');
+
+const connectionCounter = meter.createUpDownCounter('ws_connections', {
+  description: 'Number of active WebSocket connections',
+});
+
+const messageCounter = meter.createCounter('ws_messages_received', {
+  description: 'Total number of messages received',
+});
+
+const messageSentCounter = meter.createCounter('ws_messages_sent', {
+  description: 'Total number of messages sent',
+});
 
 export interface WebSocketConnection {
   id: string;
@@ -58,7 +76,7 @@ export interface ChannelRoute {
  * Provides reliable message delivery with acknowledgment and recovery
  */
 export class WebSocketServer extends EventEmitter {
-  private app?: Elysia;
+  private app?: any;
   private config: Required<WebSocketServerConfig>;
   private connections = new Map<string, WebSocketConnection>();
   private workerConnections = new Map<number, string>();
@@ -93,6 +111,7 @@ export class WebSocketServer extends EventEmitter {
     // Check if we're running in Bun before initializing WebSocket server
     if (typeof globalThis.Bun !== "undefined") {
       this.app = new Elysia()
+        .use(opentelemetry())
         .ws("/worker", {
           body: t.Object({
             type: t.String(),
@@ -114,6 +133,8 @@ export class WebSocketServer extends EventEmitter {
 
             // Store reference in ws for later access
             (ws.raw as any).connectionId = connectionId;
+
+            connectionCounter.add(1);
 
             self.emit("connection", connection);
             self.emit("connection-established", {
@@ -143,6 +164,7 @@ export class WebSocketServer extends EventEmitter {
 
             if (connection) {
               self.handleDisconnection(connection);
+              connectionCounter.add(-1);
               self.emit("close", {
                 connectionId,
                 code,
@@ -330,6 +352,8 @@ export class WebSocketServer extends EventEmitter {
           connectionId: connection.id,
           message,
         });
+        
+        messageSentCounter.add(1, { type: message.type });
 
         return true;
       }
@@ -351,50 +375,73 @@ export class WebSocketServer extends EventEmitter {
     connection: WebSocketConnection,
     message: WorkerMessage
   ): Promise<void> {
-    // Update last activity
-    connection.lastPing = new Date();
+    return tracer.startActiveSpan('WebSocketServer.handleMessage', async (span) => {
+      span.setAttribute('message.type', message.type);
+      span.setAttribute('connection.id', connection.id);
+      if (message.id) span.setAttribute('message.id', message.id);
+      
+      messageCounter.add(1, { type: message.type });
 
-    // Handle acknowledgments
-    if (
-      message.type === WorkerMessageType.JOB_ACK &&
-      message.payload?.originalMessageId
-    ) {
-      this.handleAcknowledgment(connection, message.payload.originalMessageId);
-      return;
-    }
+      try {
+        // Update last activity
+        connection.lastPing = new Date();
 
-    // Handle pong messages
-    if (message.type === WorkerMessageType.PONG) {
-      connection.lastPong = new Date();
-      return;
-    }
+        // Handle acknowledgments
+        if (
+          message.type === WorkerMessageType.JOB_ACK &&
+          message.payload?.originalMessageId
+        ) {
+          this.handleAcknowledgment(connection, message.payload.originalMessageId);
+          span.addEvent('Ack handled');
+          return;
+        }
 
-    // Handle channel messages
-    if (message.type === WorkerMessageType.CHANNEL && message.payload) {
-      const channelMessage = message.payload as ChannelMessage;
-      for (const route of this.channelRoutes) {
-        await route.handler(connection, channelMessage);
+        // Handle pong messages
+        if (message.type === WorkerMessageType.PONG) {
+          connection.lastPong = new Date();
+          span.addEvent('Pong handled');
+          return;
+        }
+
+        // Handle channel messages
+        if (message.type === WorkerMessageType.CHANNEL && message.payload) {
+          const channelMessage = message.payload as ChannelMessage;
+          for (const route of this.channelRoutes) {
+            await route.handler(connection, channelMessage);
+          }
+          span.addEvent('Channel message passed to routes');
+          return;
+        }
+
+        // Route message to handlers
+        for (const route of this.messageRoutes) {
+          if (this.matchesRoute(message, route.pattern)) {
+            await route.handler(connection, message);
+          }
+        }
+
+        // Handle worker registration
+        if (message.type === WorkerMessageType.WORKER_READY) {
+          console.log("WebSocketServer: Received WORKER_READY message", message);
+          await this.handleWorkerReady(connection, message);
+          span.addEvent('Worker registered');
+        }
+
+        // Send acknowledgment if message has an ID
+        if (message.id) {
+          await this.sendAcknowledgment(connection, message.id);
+          span.addEvent('Ack sent');
+        }
+        
+        span.setStatus({ code: SpanStatusCode.OK });
+      } catch (error) {
+        span.recordException(error as Error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
+        throw error;
+      } finally {
+        span.end();
       }
-      return;
-    }
-
-    // Route message to handlers
-    for (const route of this.messageRoutes) {
-      if (this.matchesRoute(message, route.pattern)) {
-        await route.handler(connection, message);
-      }
-    }
-
-    // Handle worker registration
-    if (message.type === WorkerMessageType.WORKER_READY) {
-      console.log("WebSocketServer: Received WORKER_READY message", message);
-      await this.handleWorkerReady(connection, message);
-    }
-
-    // Send acknowledgment if message has an ID
-    if (message.id) {
-      await this.sendAcknowledgment(connection, message.id);
-    }
+    });
   }
 
   /**

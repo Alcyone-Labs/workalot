@@ -56,7 +56,7 @@ describe("Job System", () => {
     });
 
     it("should execute job successfully", async () => {
-      const payload = { operation: "pong" };
+      const payload = { message: "test" }; // message triggers pong response
       const context = {
         jobId: "test-pong",
         startTime: Date.now(),
@@ -68,7 +68,7 @@ describe("Job System", () => {
       };
       const result = await jobLoader.executeJob(
         {
-          jobFile: "./examples/PingJob.ts",
+          jobFile: "./tests/fixtures/SimpleTestJob.ts",
           jobPayload: payload,
         },
         context,

@@ -17,6 +17,15 @@ examples/**/*.js
 examples/**/*.d.ts
 examples/**/*.js.map
 examples/**/*.d.ts.map
+examples/**/*.db-shm
+examples/**/*.db-wal
 
 # Keep only essential docs (performance charts, etc.)
 # All documentation is consolidated in README.md
+
+.agents
+.factory
+.gemini
+.antigravity
+.claude
+.opencode

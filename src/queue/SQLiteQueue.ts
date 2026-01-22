@@ -144,16 +144,13 @@ export class SQLiteQueue extends IQueueBackend {
     try {
       const migrationFile = join(this.config.migrationsPath, '001_initial_schema.sql');
       const migrationSQL = await readFile(migrationFile, 'utf-8');
-      
+
       // Execute migration in a transaction
-      if (isBun) {
-        const transaction = this.db.transaction(() => {
-          this.db.exec(migrationSQL);
-        });
-        transaction();
-      } else {
+      // Both Bun's native SQLite and better-sqlite3 support the same transaction API
+      const transaction = this.db.transaction(() => {
         this.db.exec(migrationSQL);
-      }
+      });
+      transaction();
 
       if (this.config.debug) {
         console.log('SQLite migrations completed successfully');
@@ -269,16 +266,17 @@ export class SQLiteQueue extends IQueueBackend {
   async getNextPendingJob(): Promise<QueueItem | undefined> {
     try {
       // Use a transaction to atomically claim the job
-      const transaction = isBun ? this.db.transaction(() => {
+      // Both Bun's native SQLite and better-sqlite3 support the same transaction API
+      const transaction = this.db.transaction(() => {
         // Get the next pending job
         const selectStmt = this.db.prepare(`
-          SELECT * FROM jobs 
-          WHERE status = 'pending' 
+          SELECT * FROM jobs
+          WHERE status = 'pending'
             AND (scheduled_for IS NULL OR scheduled_for <= datetime('now'))
-          ORDER BY priority DESC, requested_at ASC 
+          ORDER BY priority DESC, requested_at ASC
           LIMIT 1
         `);
-        
+
         const row = selectStmt.get();
         if (!row) {
           return undefined;
@@ -286,45 +284,18 @@ export class SQLiteQueue extends IQueueBackend {
 
         // Update it to processing
         const updateStmt = this.db.prepare(`
-          UPDATE jobs 
+          UPDATE jobs
           SET status = 'processing', started_at = datetime('now')
           WHERE id = ? AND status = 'pending'
         `);
-        
+
         const updateResult = updateStmt.run(row.id);
         if (updateResult.changes === 0) {
           return undefined; // Job was claimed by another worker
         }
 
         return row;
-      }) : () => {
-        // For better-sqlite3, we need to handle this differently
-        const selectStmt = this.db.prepare(`
-          SELECT * FROM jobs 
-          WHERE status = 'pending' 
-            AND (scheduled_for IS NULL OR scheduled_for <= datetime('now'))
-          ORDER BY priority DESC, requested_at ASC 
-          LIMIT 1
-        `);
-        
-        const row = selectStmt.get();
-        if (!row) {
-          return undefined;
-        }
-
-        const updateStmt = this.db.prepare(`
-          UPDATE jobs 
-          SET status = 'processing', started_at = datetime('now')
-          WHERE id = ? AND status = 'pending'
-        `);
-        
-        const updateResult = updateStmt.run(row.id);
-        if (updateResult.changes === 0) {
-          return undefined;
-        }
-
-        return row;
-      };
+      });
 
       const row = transaction();
       if (!row) {
@@ -334,7 +305,7 @@ export class SQLiteQueue extends IQueueBackend {
       // Update the row to reflect the new status
       row.status = JobStatus.PROCESSING;
       row.started_at = new Date().toISOString();
-      
+
       return this.mapRowToQueueItem(row);
     } catch (error) {
       throw new Error(`Failed to get next pending job: ${error instanceof Error ? error.message : String(error)}`);
@@ -404,18 +375,25 @@ export class SQLiteQueue extends IQueueBackend {
   }
 
   async recoverStalledJobs(stalledTimeoutMs: number = 300000): Promise<number> {
-    const stalledJobs = await this.getStalledJobs(stalledTimeoutMs);
-
-    if (stalledJobs.length === 0) {
-      return 0;
-    }
-
     // Calculate the cutoff time in milliseconds since epoch
     const cutoffTime = Date.now() - stalledTimeoutMs;
     const cutoffDate = new Date(cutoffTime).toISOString();
 
     // Use a transaction to atomically recover all stalled jobs
-    const transaction = isBun ? this.db.transaction(() => {
+    // Both Bun's native SQLite and better-sqlite3 support the same transaction API
+    const transaction = this.db.transaction(() => {
+      // First, count how many jobs will be recovered
+      const countStmt = this.db.prepare(`
+        SELECT COUNT(*) as count
+        FROM jobs
+        WHERE status = 'processing'
+          AND started_at < ?
+      `);
+
+      const countResult = countStmt.get(cutoffDate);
+      const count = countResult.count || 0;
+
+      // Then update the jobs
       const updateStmt = this.db.prepare(`
         UPDATE jobs
         SET status = 'pending', started_at = NULL, worker_id = NULL
@@ -423,19 +401,10 @@ export class SQLiteQueue extends IQueueBackend {
           AND started_at < ?
       `);
 
-      const result = updateStmt.run(cutoffDate);
-      return result.changes || 0;
-    }) : () => {
-      const updateStmt = this.db.prepare(`
-        UPDATE jobs
-        SET status = 'pending', started_at = NULL, worker_id = NULL
-        WHERE status = 'processing'
-          AND started_at < ?
-      `);
+      updateStmt.run(cutoffDate);
 
-      const result = updateStmt.run(cutoffDate);
-      return result.changes || 0;
-    };
+      return count;
+    });
 
     const recoveredCount = transaction();
 
@@ -487,7 +456,8 @@ export class SQLiteQueue extends IQueueBackend {
   // Optional: Batch job processing for better performance
   async getNextPendingJobs(count: number): Promise<QueueItem[]> {
     try {
-      const transaction = isBun ? this.db.transaction(() => {
+      // Both Bun's native SQLite and better-sqlite3 support the same transaction API
+      const transaction = this.db.transaction(() => {
         // Get multiple pending jobs
         const selectStmt = this.db.prepare(`
           SELECT * FROM jobs
@@ -521,40 +491,7 @@ export class SQLiteQueue extends IQueueBackend {
         }
 
         return claimedRows;
-      }) : () => {
-        const selectStmt = this.db.prepare(`
-          SELECT * FROM jobs
-          WHERE status = 'pending'
-            AND (scheduled_for IS NULL OR scheduled_for <= datetime('now'))
-          ORDER BY priority DESC, requested_at ASC
-          LIMIT ?
-        `);
-
-        const rows = selectStmt.all(count);
-        if (rows.length === 0) {
-          return [];
-        }
-
-        // Atomically update all selected jobs to processing status
-        const updateStmt = this.db.prepare(`
-          UPDATE jobs
-          SET status = 'processing', started_at = datetime('now')
-          WHERE id = ? AND status = 'pending'
-        `);
-
-        const claimedRows = [];
-        for (const row of rows) {
-          const updateResult = updateStmt.run(row.id);
-          if (updateResult.changes > 0) {
-            // Successfully claimed this job
-            row.status = JobStatus.PROCESSING;
-            row.started_at = new Date().toISOString();
-            claimedRows.push(row);
-          }
-        }
-
-        return claimedRows;
-      };
+      });
 
       const rows = transaction();
       return rows.map((row: any) => this.mapRowToQueueItem(row));

@@ -1,0 +1,13 @@
+{
+  "ignorePatterns": [
+    "dist",
+    "node_modules"
+  ],
+  "rules": {
+    "correctness": "warn",
+    "style": "allow",
+    "perf": "warn",
+    "no-unused-vars": "allow",
+    "typescript/no-unused-vars": "allow"
+  }
+}
