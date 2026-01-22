@@ -85,10 +85,7 @@ export class JobLoader {
 
       return job;
     } catch (error) {
-      if (
-        error instanceof JobLoadError ||
-        error instanceof JobValidationError
-      ) {
+      if (error instanceof JobLoadError || error instanceof JobValidationError) {
         throw error;
       }
       throw new JobLoadError(
@@ -160,10 +157,7 @@ export class JobLoader {
     }
 
     if (typeof job.getJobId !== "function") {
-      throw new JobValidationError(
-        "Job must implement getJobId() method",
-        jobFile,
-      );
+      throw new JobValidationError("Job must implement getJobId() method", jobFile);
     }
 
     if (typeof job.run !== "function") {
@@ -174,10 +168,7 @@ export class JobLoader {
   /**
    * Executes a job with the given payload
    */
-  async executeJob(
-    jobPayload: JobPayload,
-    context: JobExecutionContext,
-  ): Promise<any> {
+  async executeJob(jobPayload: JobPayload, context: JobExecutionContext): Promise<any> {
     const job = await this.loadJob(jobPayload.jobFile.toString());
 
     try {

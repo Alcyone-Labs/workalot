@@ -57,14 +57,17 @@ const queue = new SQLiteQueue({
 
 ```typescript
 // Run cleanup periodically
-setInterval(async () => {
-  const stats = await queue.getStats();
+setInterval(
+  async () => {
+    const stats = await queue.getStats();
 
-  if (stats.total > 10000) {
-    const cleaned = await queue.cleanup();
-    console.log(`Cleaned up ${cleaned} old jobs`);
-  }
-}, 60 * 60 * 1000); // Every hour
+    if (stats.total > 10000) {
+      const cleaned = await queue.cleanup();
+      console.log(`Cleaned up ${cleaned} old jobs`);
+    }
+  },
+  60 * 60 * 1000,
+); // Every hour
 
 // Cleanup removes jobs older than maxInMemoryAge (default: 24 hours)
 ```
@@ -154,7 +157,7 @@ async function enableTimescaleDBSafely(queue: PostgreSQLQueue): Promise<void> {
 async function scheduleWithExternalPayload(
   queue: RedisQueue,
   jobFile: string,
-  largePayload: any
+  largePayload: any,
 ): Promise<string> {
   // Store large payload in S3/filesystem
   const payloadRef = await storeExternal(largePayload);
@@ -298,7 +301,7 @@ if (process.env.LOW_MEMORY) {
 // Validate queue config before switching
 async function validateBackendCompatibility(
   oldBackend: string,
-  newBackend: string
+  newBackend: string,
 ): Promise<boolean> {
   const features = {
     memory: { priority: false, scheduling: true },
@@ -313,9 +316,7 @@ async function validateBackendCompatibility(
   // Check if jobs use features not supported by new backend
   for (const feature of Object.keys(oldFeatures)) {
     if (!newFeatures[feature as keyof typeof newFeatures]) {
-      console.warn(
-        `New backend doesn't support ${feature}, jobs using it will fail`
-      );
+      console.warn(`New backend doesn't support ${feature}, jobs using it will fail`);
       return false;
     }
   }
@@ -366,14 +367,16 @@ async function validateBackendCompatibility(
 ```typescript
 async function safeBackendMigration(
   oldQueue: IQueueBackend,
-  newQueue: IQueueBackend
+  newQueue: IQueueBackend,
 ): Promise<void> {
   // 1. Stop accepting new jobs to old queue
   // 2. Wait for old queue to empty
   let stats = await oldQueue.getStats();
   while (stats.pending > 0 || stats.processing > 0) {
-    console.log(`Waiting for old queue to drain: ${stats.pending} pending, ${stats.processing} processing`);
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log(
+      `Waiting for old queue to drain: ${stats.pending} pending, ${stats.processing} processing`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     stats = await oldQueue.getStats();
   }
 

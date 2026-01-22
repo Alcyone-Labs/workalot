@@ -58,10 +58,7 @@ export class SimpleWorker extends EventEmitter {
     });
 
     // Initialize job executor
-    this.jobExecutor = new JobExecutor(
-      this.config.projectRoot!,
-      this.config.defaultTimeout!,
-    );
+    this.jobExecutor = new JobExecutor(this.config.projectRoot!, this.config.defaultTimeout!);
   }
 
   /**
@@ -144,11 +141,11 @@ export class SimpleWorker extends EventEmitter {
       const result = await this.jobExecutor.executeJob(jobPayload, context);
 
       // Send success result
-const jobResult: JobResult = {
-      results: result,
-      executionTime: Date.now() - startTime,
-      queueTime: 0,
-    };
+      const jobResult: JobResult = {
+        results: result,
+        executionTime: Date.now() - startTime,
+        queueTime: 0,
+      };
 
       this.wsClient.send({
         type: WorkerMessageType.JOB_RESULT,
@@ -159,11 +156,11 @@ const jobResult: JobResult = {
       this.emit("job-completed", jobResult);
     } catch (error) {
       // Send error result
-const jobResult: JobResult = {
-      results: { error: error instanceof Error ? error.message : String(error) },
-      executionTime: Date.now() - startTime,
-      queueTime: 0,
-    };
+      const jobResult: JobResult = {
+        results: { error: error instanceof Error ? error.message : String(error) },
+        executionTime: Date.now() - startTime,
+        queueTime: 0,
+      };
 
       this.wsClient.send({
         type: WorkerMessageType.JOB_ERROR,

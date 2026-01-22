@@ -1,5 +1,5 @@
-import { cpus } from 'node:os';
-import { CPUMeasurement, MemoryMeasurement } from './benchmark-config.js';
+import { cpus } from "node:os";
+import { CPUMeasurement, MemoryMeasurement } from "./benchmark-config.js";
 
 export class PerformanceMonitor {
   private cpuMeasurements: CPUMeasurement[] = [];
@@ -50,7 +50,7 @@ export class PerformanceMonitor {
 
     return {
       cpu: [...this.cpuMeasurements],
-      memory: [...this.memoryMeasurements]
+      memory: [...this.memoryMeasurements],
     };
   }
 
@@ -62,7 +62,7 @@ export class PerformanceMonitor {
     let totalIdle = 0;
     let totalTick = 0;
 
-    cpuInfo.forEach(cpu => {
+    cpuInfo.forEach((cpu) => {
       for (const type in cpu.times) {
         totalTick += cpu.times[type as keyof typeof cpu.times];
       }
@@ -71,11 +71,11 @@ export class PerformanceMonitor {
 
     const idle = totalIdle / cpuInfo.length;
     const total = totalTick / cpuInfo.length;
-    const usage = 100 - (100 * idle / total);
+    const usage = 100 - (100 * idle) / total;
 
     this.cpuMeasurements.push({
       timestamp: Date.now() - this.startTime,
-      usage: Math.max(0, Math.min(100, usage))
+      usage: Math.max(0, Math.min(100, usage)),
     });
   }
 
@@ -84,13 +84,13 @@ export class PerformanceMonitor {
    */
   private measureMemory(): void {
     const memUsage = process.memoryUsage();
-    
+
     this.memoryMeasurements.push({
       timestamp: Date.now() - this.startTime,
       heapUsed: memUsage.heapUsed,
       heapTotal: memUsage.heapTotal,
       external: memUsage.external,
-      rss: memUsage.rss
+      rss: memUsage.rss,
     });
   }
 
@@ -107,11 +107,11 @@ export class PerformanceMonitor {
     }
 
     let values: number[];
-    
-    if ('usage' in measurements[0]) {
-      values = (measurements as CPUMeasurement[]).map(m => m.usage);
+
+    if ("usage" in measurements[0]) {
+      values = (measurements as CPUMeasurement[]).map((m) => m.usage);
     } else {
-      values = (measurements as MemoryMeasurement[]).map(m => m.rss);
+      values = (measurements as MemoryMeasurement[]).map((m) => m.rss);
     }
 
     const peak = Math.max(...values);

@@ -62,9 +62,7 @@ export class ReportGenerationJob extends BaseJob {
     return this.createSuccessResult({
       reportType: payload.reportType,
       format: payload.format,
-      downloadUrl: `https://cdn.example.com/reports/${Date.now()}.${
-        payload.format
-      }`,
+      downloadUrl: `https://cdn.example.com/reports/${Date.now()}.${payload.format}`,
       fileSize: this.calculateFileSize(payload.format, pageCount),
       pageCount,
       sections,
@@ -73,10 +71,7 @@ export class ReportGenerationJob extends BaseJob {
     });
   }
 
-  private async generateReportContent(
-    reportType: string,
-    sections: string[]
-  ): Promise<void> {
+  private async generateReportContent(reportType: string, sections: string[]): Promise<void> {
     switch (reportType) {
       case "monthly-summary":
         await this.simulateOperation("Generating monthly metrics", 600);
@@ -90,38 +85,23 @@ export class ReportGenerationJob extends BaseJob {
           "Q2 Overview",
           "Q3 Overview",
           "Q4 Overview",
-          "Year-over-Year Comparison"
+          "Year-over-Year Comparison",
         );
         break;
 
       case "annual-report":
         await this.simulateOperation("Generating annual statistics", 1200);
-        sections.push(
-          "Annual Overview",
-          "Financial Summary",
-          "Key Achievements",
-          "Future Outlook"
-        );
+        sections.push("Annual Overview", "Financial Summary", "Key Achievements", "Future Outlook");
         break;
 
       case "sales-report":
         await this.simulateOperation("Analyzing sales data", 700);
-        sections.push(
-          "Sales Overview",
-          "Top Products",
-          "Regional Performance",
-          "Sales Trends"
-        );
+        sections.push("Sales Overview", "Top Products", "Regional Performance", "Sales Trends");
         break;
 
       case "user-analytics":
         await this.simulateOperation("Processing user metrics", 800);
-        sections.push(
-          "User Growth",
-          "Engagement Metrics",
-          "Retention Analysis",
-          "Demographics"
-        );
+        sections.push("User Growth", "Engagement Metrics", "Retention Analysis", "Demographics");
         break;
 
       default:
@@ -154,10 +134,7 @@ export class ReportGenerationJob extends BaseJob {
     return (baseSize[format as keyof typeof baseSize] || 20000) * pageCount;
   }
 
-  private async simulateOperation(
-    description: string,
-    duration: number
-  ): Promise<void> {
+  private async simulateOperation(description: string, duration: number): Promise<void> {
     // In a real application, you would log progress here
     // console.log(`[ReportGeneration] ${description}...`);
     await new Promise((resolve) => setTimeout(resolve, duration));

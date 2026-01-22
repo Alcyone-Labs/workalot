@@ -30,7 +30,7 @@ describe("API Layer", () => {
     let taskManager: TaskManager;
 
     beforeEach(async () => {
-      testPersistenceFile = getTempTsonFile('api');
+      testPersistenceFile = getTempTsonFile("api");
 
       taskManager = new TaskManager({
         backend: "pglite",
@@ -75,26 +75,28 @@ describe("API Layer", () => {
 
       const promises: Promise<{ jobId: string; completedAt: number }>[] = [];
       for (let i = 1; i <= 3; i++) {
-        const promise = taskManager.scheduleAndWait({
-          jobFile: "./tests/fixtures/TimedJob.ts",
-          jobPayload: {
-            jobId: `Job-${i}`,
-            duration: 100,
-            uniqueId: `test-${i}-${Date.now()}-${Math.random()}`
-          }
-        }).then(result => ({
-          jobId: result.results.data.jobId,
-          completedAt: result.results.data.completedAt
-        }));
+        const promise = taskManager
+          .scheduleAndWait({
+            jobFile: "./tests/fixtures/TimedJob.ts",
+            jobPayload: {
+              jobId: `Job-${i}`,
+              duration: 100,
+              uniqueId: `test-${i}-${Date.now()}-${Math.random()}`,
+            },
+          })
+          .then((result) => ({
+            jobId: result.results.data.jobId,
+            completedAt: result.results.data.completedAt,
+          }));
         promises.push(promise);
       }
 
       const results = await Promise.all(promises);
 
       // Verify each scheduleNow resolved with correct job
-      expect(results[0].jobId).toBe('Job-1');
-      expect(results[1].jobId).toBe('Job-2');
-      expect(results[2].jobId).toBe('Job-3');
+      expect(results[0].jobId).toBe("Job-1");
+      expect(results[1].jobId).toBe("Job-2");
+      expect(results[2].jobId).toBe("Job-3");
 
       // Verify timing - all should complete within reasonable time
       const totalTime = Date.now() - startTime;
@@ -107,7 +109,7 @@ describe("API Layer", () => {
       const timeoutPromise = taskManager.scheduleAndWait({
         jobFile: "./tests/fixtures/TimeoutJob.ts",
         jobPayload: { delay: 2000 }, // 2 second delay
-        jobTimeout: 500 // 0.5 second timeout
+        jobTimeout: 500, // 0.5 second timeout
       });
 
       await expect(timeoutPromise).rejects.toThrow(/timed out/);
@@ -129,16 +131,16 @@ describe("API Layer", () => {
       const scheduleAndWaitResult = await taskManager.scheduleAndWait({
         jobFile: "./tests/fixtures/TimedJob.ts",
         jobPayload: {
-          jobId: 'ScheduleAndWait-Job',
+          jobId: "ScheduleAndWait-Job",
           duration: 50,
-          uniqueId: `scheduleandwait-${Date.now()}-${Math.random()}`
-        }
+          uniqueId: `scheduleandwait-${Date.now()}-${Math.random()}`,
+        },
       });
 
       // scheduleAndWait should have waited for its own job to complete
       const waitTime = Date.now() - startTime;
       expect(waitTime).toBeGreaterThan(45); // At least the job duration
-      expect(scheduleAndWaitResult.results.data.jobId).toBe('ScheduleAndWait-Job');
+      expect(scheduleAndWaitResult.results.data.jobId).toBe("ScheduleAndWait-Job");
       expect(scheduleAndWaitResult.results.success).toBe(true);
     });
 

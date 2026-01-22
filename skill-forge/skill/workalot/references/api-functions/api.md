@@ -7,6 +7,7 @@
 Create named TaskManager instance.
 
 **Parameters**:
+
 - `name`: Unique instance identifier (used for destroy)
 - `config`: QueueConfig object (see configuration.md)
 
@@ -15,6 +16,7 @@ Create named TaskManager instance.
 **Throws**: Error if name already exists
 
 **Example**:
+
 ```typescript
 const manager = await createTaskManager("main", {
   backend: "sqlite",
@@ -28,9 +30,11 @@ const manager = await createTaskManager("main", {
 Shutdown and destroy named TaskManager instance.
 
 **Parameters**:
+
 - `name`: Instance identifier from createTaskManager
 
 **Example**:
+
 ```typescript
 await destroyTaskManager("main");
 ```
@@ -40,6 +44,7 @@ await destroyTaskManager("main");
 Schedule job and wait for completion using specific manager instance.
 
 **Parameters**:
+
 - `manager`: TaskManager instance from createTaskManager
 - `jobPayload`: JobRequest object (see Request Configuration)
 
@@ -48,6 +53,7 @@ Schedule job and wait for completion using specific manager instance.
 **Throws**: Error if manager doesn't exist
 
 **Example**:
+
 ```typescript
 const result = await scheduleAndWaitWith(manager, {
   jobFile: "jobs/ProcessDataJob.ts",
@@ -64,12 +70,14 @@ console.log("Result:", result.result);
 Schedule job without waiting (fire-and-forget), returns job ID.
 
 **Parameters**:
+
 - `manager`: TaskManager instance
 - `jobPayload`: JobRequest object
 
 **Returns**: Promise<string> (job ID)
 
 **Example**:
+
 ```typescript
 const jobId = await scheduleWith(manager, {
   jobFile: "jobs/BackgroundJob.ts",
@@ -84,10 +92,12 @@ console.log("Job scheduled:", jobId);
 Register callback when queue becomes empty.
 
 **Parameters**:
+
 - `manager`: TaskManager instance
 - `callback`: Function to execute when queue empty
 
 **Example**:
+
 ```typescript
 whenFreeWith(manager, () => {
   console.log("Queue is empty!");
@@ -100,11 +110,13 @@ whenFreeWith(manager, () => {
 Get queue statistics from specific manager instance.
 
 **Parameters**:
+
 - `manager`: TaskManager instance
 
 **Returns**: Promise<QueueStats>
 
 **Example**:
+
 ```typescript
 const stats = await getQueueStatsWith(manager);
 
@@ -119,11 +131,13 @@ console.log(`Processing: ${stats.processing}`);
 Schedule job using default singleton instance.
 
 **Parameters**:
+
 - `jobPayload`: JobRequest object
 
 **Returns**: Promise<JobResult>
 
 **Example**:
+
 ```typescript
 import { scheduleAndWait } from "#/index.js";
 
@@ -138,11 +152,13 @@ const result = await scheduleAndWait({
 Schedule job without waiting using default singleton.
 
 **Parameters**:
+
 - `jobPayload`: JobRequest object
 
 **Returns**: Promise<string> (job ID)
 
 **Example**:
+
 ```typescript
 import { schedule } from "#/index.js";
 
@@ -175,6 +191,7 @@ Create factory configured for development (Memory backend, 2 threads, no recover
 **Returns**: TaskManagerFactory instance
 
 **Example**:
+
 ```typescript
 const devFactory = TaskManagerFactoryPresets.development();
 const manager = await devFactory.create("dev");
@@ -185,11 +202,13 @@ const manager = await devFactory.create("dev");
 Create factory for production SQLite (WAL mode, system threads, recovery enabled).
 
 **Parameters**:
+
 - `dbPath`: Path to SQLite database file
 
 **Returns**: TaskManagerFactory instance
 
 **Example**:
+
 ```typescript
 const prodFactory = TaskManagerFactoryPresets.productionSQLite("./prod.db");
 const manager = await prodFactory.create("main");
@@ -200,14 +219,16 @@ const manager = await prodFactory.create("main");
 Create factory for production PostgreSQL (pool, LISTEN/NOTIFY, recovery).
 
 **Parameters**:
+
 - `dbUrl`: PostgreSQL connection string
 
 **Returns**: TaskManagerFactory instance
 
 **Example**:
+
 ```typescript
 const pgFactory = TaskManagerFactoryPresets.productionPostgreSQL(
-  "postgresql://user:pass@localhost:5432/db"
+  "postgresql://user:pass@localhost:5432/db",
 );
 const manager = await pgFactory.create("main");
 ```
@@ -221,6 +242,7 @@ Get worker statistics (total, available, busy).
 **Returns**: Promise<WorkerStats>
 
 **Example**:
+
 ```typescript
 const workers = await getWorkerStats();
 

@@ -114,11 +114,7 @@ Workalot uses a modern WebSocket-based architecture that enables:
 The factory pattern provides better testability and support for multiple instances:
 
 ```typescript
-import {
-  createTaskManager,
-  scheduleAndWaitWith,
-  destroyTaskManager,
-} from "@alcyone-labs/workalot";
+import { createTaskManager, scheduleAndWaitWith, destroyTaskManager } from "@alcyone-labs/workalot";
 
 // Create a named instance
 const manager = await createTaskManager("main", {
@@ -154,7 +150,7 @@ const prodManager = await prodFactory.create("main");
 
 // Production with PostgreSQL
 const pgFactory = TaskManagerFactoryPresets.productionPostgreSQL(
-  "postgresql://user:pass@localhost/db"
+  "postgresql://user:pass@localhost/db",
 );
 const pgManager = await pgFactory.create("main");
 ```
@@ -559,14 +555,11 @@ export default class RobustJob extends BaseJob implements IJob {
       return this.success(result);
     } catch (error) {
       // Detailed error reporting
-      return this.error(
-        error instanceof Error ? error.message : "Unknown error",
-        {
-          payload,
-          stack: error instanceof Error ? error.stack : undefined,
-          timestamp: new Date().toISOString(),
-        }
-      );
+      return this.error(error instanceof Error ? error.message : "Unknown error", {
+        payload,
+        stack: error instanceof Error ? error.stack : undefined,
+        timestamp: new Date().toISOString(),
+      });
     }
   }
 
@@ -647,9 +640,7 @@ Subsequent jobs in a workflow can access the accumulated context:
 export default class ValidationJob extends BaseJob implements IJob {
   async run(payload: any, context: JobExecutionContext): Promise<any> {
     if (!context.metaEnvelope) {
-      throw new Error(
-        "Meta envelope not found - this job should be part of a workflow"
-      );
+      throw new Error("Meta envelope not found - this job should be part of a workflow");
     }
 
     const workflowId = context.metaEnvelope.workflowId;
@@ -819,13 +810,11 @@ import { WorkerMessageType } from "@alcyone-labs/workalot";
 
 // Register custom message filters
 server.registerStructuredRoute(
-  (message) =>
-    message.type === WorkerMessageType.JOB_RESULT &&
-    message.payload?.success === false,
+  (message) => message.type === WorkerMessageType.JOB_RESULT && message.payload?.success === false,
   (connection, message) => {
     console.log("Handling failed job:", message.payload);
     // Custom logic for failed jobs
-  }
+  },
 );
 ```
 

@@ -5,6 +5,7 @@
 Workalot v2.x uses WebSocket-based distributed architecture replacing Node.js worker threads (`postMessage`) from v1.x.
 
 **Key Components**:
+
 - **Orchestrator**: WebSocket server managing job queue and worker distribution
 - **Workers**: WebSocket clients connecting to orchestrator for job processing
 - **Channel Routing**: Hierarchical messaging for complex workflows
@@ -13,6 +14,7 @@ Workalot v2.x uses WebSocket-based distributed architecture replacing Node.js wo
 ## When to Use WebSocket Architecture
 
 Use WebSocket workers when you need:
+
 - Multi-machine job distribution (horizontal scaling)
 - Independent worker processes (isolation, fault tolerance)
 - Real-time job distribution across containers/nodes
@@ -84,6 +86,7 @@ await orchestrator.shutdown();
 ```
 
 **Configuration Options**:
+
 - `wsPort`: WebSocket server port (default: 8080)
 - `wsHostname`: Server hostname (default: "localhost")
 - `distributionStrategy`: "round-robin" | "random" (default: "round-robin")
@@ -112,6 +115,7 @@ await worker.shutdown();
 ```
 
 **Configuration Options**:
+
 - `workerId`: Unique worker number (1, 2, 3, ...)
 - `wsUrl`: WebSocket server URL
 - `projectRoot`: Project root directory for job file resolution
@@ -200,6 +204,7 @@ server.registerChannelRoute({
 ```
 
 **Channel Message Format**:
+
 ```typescript
 interface ChannelMessage {
   type: string; // Main message type
@@ -291,6 +296,7 @@ Periodic worker health check:
 ### Orchestrator Worker Management
 
 Orchestrator tracks worker state:
+
 - **Idle**: Available for new jobs
 - **Busy**: Currently processing job
 - **Offline**: Disconnected from WebSocket
@@ -344,11 +350,13 @@ try {
 ### Job Distribution Strategies
 
 **Round-Robin**: Workers 1, 2, 3, 1, 2, 3...
+
 - Predictable distribution
 - Good for equal job durations
 - Fair load balancing
 
 **Random**: Workers 2, 1, 3, 2, 1, 3...
+
 - Better for variable job durations
 - Averages out processing times
 - Simple implementation

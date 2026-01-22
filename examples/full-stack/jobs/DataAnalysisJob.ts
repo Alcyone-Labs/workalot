@@ -73,14 +73,11 @@ export class DataAnalysisJob extends BaseJob {
   private async processOperation(
     operation: string,
     recordCount: number,
-    results: DataAnalysisResult["results"]
+    results: DataAnalysisResult["results"],
   ): Promise<void> {
     switch (operation) {
       case "aggregate":
-        await this.simulateOperation(
-          `Aggregating ${recordCount} records`,
-          1000
-        );
+        await this.simulateOperation(`Aggregating ${recordCount} records`, 1000);
         results.summary = {
           total: Math.floor(Math.random() * 1000000) + 100000,
           average: Math.floor(Math.random() * 1000) + 100,
@@ -91,11 +88,7 @@ export class DataAnalysisJob extends BaseJob {
 
       case "trend-analysis":
         await this.simulateOperation("Analyzing trends", 800);
-        const directions: Array<"up" | "down" | "stable"> = [
-          "up",
-          "down",
-          "stable",
-        ];
+        const directions: Array<"up" | "down" | "stable"> = ["up", "down", "stable"];
         results.trends = {
           direction: directions[Math.floor(Math.random() * directions.length)],
           percentage: Math.floor(Math.random() * 50) + 1,
@@ -125,10 +118,7 @@ export class DataAnalysisJob extends BaseJob {
     }
   }
 
-  private async simulateOperation(
-    description: string,
-    duration: number
-  ): Promise<void> {
+  private async simulateOperation(description: string, duration: number): Promise<void> {
     // In a real application, you would log progress here
     // console.log(`[DataAnalysis] ${description}...`);
     await new Promise((resolve) => setTimeout(resolve, duration));

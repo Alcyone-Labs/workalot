@@ -1,13 +1,7 @@
 import Redis, { RedisOptions } from "ioredis";
 import { ulid } from "ulidx";
 import { IQueueBackend, QueueStats } from "./IQueueBackend.js";
-import {
-  QueueItem,
-  JobStatus,
-  JobPayload,
-  JobResult,
-  QueueConfig,
-} from "../types/index.js";
+import { QueueItem, JobStatus, JobPayload, JobResult, QueueConfig } from "../types/index.js";
 
 export interface RedisQueueConfig extends QueueConfig {
   /**
@@ -151,7 +145,7 @@ export class RedisQueue extends IQueueBackend {
       throw new Error(
         `Failed to initialize RedisQueue: ${
           error instanceof Error ? error.message : String(error)
-        }`
+        }`,
       );
     }
   }
@@ -262,7 +256,7 @@ export class RedisQueue extends IQueueBackend {
     if (this.enablePubSub) {
       await this.redis.publish(
         this.key("notifications"),
-        JSON.stringify({ type: "job-added", jobId: id })
+        JSON.stringify({ type: "job-added", jobId: id }),
       );
     }
 
@@ -285,12 +279,8 @@ export class RedisQueue extends IQueueBackend {
       jobPayload: JSON.parse(data.payload),
       status: data.status as JobStatus,
       requestedAt: new Date(parseInt(data.requestedAt)),
-      startedAt: data.startedAt
-        ? new Date(parseInt(data.startedAt))
-        : undefined,
-      completedAt: data.completedAt
-        ? new Date(parseInt(data.completedAt))
-        : undefined,
+      startedAt: data.startedAt ? new Date(parseInt(data.startedAt)) : undefined,
+      completedAt: data.completedAt ? new Date(parseInt(data.completedAt)) : undefined,
       lastUpdated: new Date(parseInt(data.lastUpdated || data.requestedAt)),
       result: data.result ? JSON.parse(data.result) : undefined,
       error: data.error ? new Error(data.error) : undefined,
@@ -314,7 +304,7 @@ export class RedisQueue extends IQueueBackend {
       this.key("queue:processing"),
       this.key("jobs:"),
       workerId,
-      now
+      now,
     )) as string | null;
 
     if (!jobId) {
@@ -336,7 +326,7 @@ export class RedisQueue extends IQueueBackend {
     status: JobStatus,
     result?: JobResult,
     error?: Error,
-    workerId?: number
+    workerId?: number,
   ): Promise<boolean> {
     const now = Date.now();
     const jobKey = this.jobKey(id);
@@ -400,7 +390,7 @@ export class RedisQueue extends IQueueBackend {
     if (this.enablePubSub) {
       await this.redis.publish(
         this.key("notifications"),
-        JSON.stringify({ type: "job-updated", jobId: id, status })
+        JSON.stringify({ type: "job-updated", jobId: id, status }),
       );
     }
 
@@ -433,12 +423,7 @@ export class RedisQueue extends IQueueBackend {
 
     // Get oldest pending job
     let oldestPending: Date | undefined;
-    const oldestPendingJob = await this.redis.zrange(
-      this.key("queue:pending"),
-      0,
-      0,
-      "WITHSCORES"
-    );
+    const oldestPendingJob = await this.redis.zrange(this.key("queue:pending"), 0, 0, "WITHSCORES");
 
     if (oldestPendingJob.length > 0) {
       const score = parseInt(oldestPendingJob[1]);
@@ -508,12 +493,8 @@ export class RedisQueue extends IQueueBackend {
     return stalledJobs.length;
   }
 
-  async getStalledJobs(
-    stalledTimeoutMs: number = 300000
-  ): Promise<QueueItem[]> {
-    const processingJobs = await this.redis.hgetall(
-      this.key("queue:processing")
-    );
+  async getStalledJobs(stalledTimeoutMs: number = 300000): Promise<QueueItem[]> {
+    const processingJobs = await this.redis.hgetall(this.key("queue:processing"));
     const now = Date.now();
     const stalledJobIds: string[] = [];
 
@@ -535,9 +516,7 @@ export class RedisQueue extends IQueueBackend {
 
   async cleanup(): Promise<number> {
     // Redis handles cleanup via TTL, but we can manually clean up old jobs
-    const completedJobs = await this.redis.smembers(
-      this.key("queue:completed")
-    );
+    const completedJobs = await this.redis.smembers(this.key("queue:completed"));
     const failedJobs = await this.redis.smembers(this.key("queue:failed"));
 
     const now = Date.now();
@@ -550,11 +529,7 @@ export class RedisQueue extends IQueueBackend {
     // Clean up old completed jobs
     for (const jobId of completedJobs) {
       const job = await this.getJob(jobId);
-      if (
-        job &&
-        job.completedAt &&
-        job.completedAt.getTime() < completedCutoff
-      ) {
+      if (job && job.completedAt && job.completedAt.getTime() < completedCutoff) {
         pipeline.del(this.jobKey(jobId));
         pipeline.srem(this.key("queue:completed"), jobId);
         pipeline.hincrby(this.key("stats"), "completed", -1);
@@ -606,9 +581,7 @@ export class RedisQueue extends IQueueBackend {
   /**
    * Batch add jobs for better performance
    */
-  async batchAddJobs(
-    jobs: Array<{ payload: JobPayload; customId?: string }>
-  ): Promise<string[]> {
+  async batchAddJobs(jobs: Array<{ payload: JobPayload; customId?: string }>): Promise<string[]> {
     const ids: string[] = [];
     const now = Date.now();
     const priority = 0;

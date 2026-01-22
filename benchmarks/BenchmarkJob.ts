@@ -1,5 +1,5 @@
-import { BaseJob } from '../src/jobs/BaseJob.js';
-import { JobExecutionContext } from '../src/types/index.js';
+import { BaseJob } from "../src/jobs/BaseJob.js";
+import { JobExecutionContext } from "../src/types/index.js";
 
 export interface BenchmarkJobPayload {
   taskType: string;
@@ -12,20 +12,20 @@ export interface BenchmarkJobPayload {
  */
 export class BenchmarkJob extends BaseJob {
   constructor() {
-    super('BenchmarkJob');
+    super("BenchmarkJob");
   }
 
   async run(
     payload: BenchmarkJobPayload,
-    context: JobExecutionContext
+    context: JobExecutionContext,
   ): Promise<Record<string, any>> {
-    this.validatePayload(payload, ['taskType', 'cpuCycles', 'jobIndex']);
+    this.validatePayload(payload, ["taskType", "cpuCycles", "jobIndex"]);
 
     const startTime = Date.now();
-    
+
     // Simulate CPU-intensive work
     await this.simulateCPUWork(payload.cpuCycles);
-    
+
     const endTime = Date.now();
     const executionTime = endTime - startTime;
 
@@ -35,7 +35,7 @@ export class BenchmarkJob extends BaseJob {
       cpuCycles: payload.cpuCycles,
       executionTime,
       jobId: context.jobId,
-      completedAt: new Date().toISOString()
+      completedAt: new Date().toISOString(),
     });
   }
 
@@ -57,13 +57,13 @@ export class BenchmarkJob extends BaseJob {
 
       // Occasional async yield to prevent blocking
       if (i % yieldInterval === 0) {
-        await new Promise(resolve => setImmediate(resolve));
+        await new Promise((resolve) => setImmediate(resolve));
       }
     }
 
     // Prevent optimization by using the result
     if (result === Number.NEGATIVE_INFINITY) {
-      throw new Error('Unexpected calculation result');
+      throw new Error("Unexpected calculation result");
     }
   }
 }

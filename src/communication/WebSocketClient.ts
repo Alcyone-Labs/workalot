@@ -178,10 +178,7 @@ export class WebSocketClient extends EventEmitter {
   /**
    * Send a message and wait for a response
    */
-  async sendAndWait<T = any>(
-    message: WorkerMessage,
-    timeout?: number,
-  ): Promise<T> {
+  async sendAndWait<T = any>(message: WorkerMessage, timeout?: number): Promise<T> {
     // Add message ID if not present
     if (!message.id) {
       message.id = ulid();
@@ -261,10 +258,7 @@ export class WebSocketClient extends EventEmitter {
       }
 
       // Handle acknowledgment
-      if (
-        message.type === WorkerMessageType.JOB_ACK &&
-        message.payload?.originalMessageId
-      ) {
+      if (message.type === WorkerMessageType.JOB_ACK && message.payload?.originalMessageId) {
         this.handleAcknowledgment(message.payload.originalMessageId);
         return;
       }

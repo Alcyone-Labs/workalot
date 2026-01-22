@@ -81,9 +81,7 @@ export class QueueFactory {
   /**
    * Get recommended configuration for different environments
    */
-  static getRecommendedConfig(
-    environment: "development" | "testing" | "production"
-  ): QueueConfig {
+  static getRecommendedConfig(environment: "development" | "testing" | "production"): QueueConfig {
     switch (environment) {
       case "development":
         return {
@@ -106,8 +104,7 @@ export class QueueFactory {
       case "production":
         return {
           backend: "postgresql", // or 'sqlite' for smaller deployments
-          databaseUrl:
-            process.env.DATABASE_URL || "postgresql://localhost/queue",
+          databaseUrl: process.env.DATABASE_URL || "postgresql://localhost/queue",
           maxThreads: Math.max(2, cpus().length - 1),
           maxInMemoryAge: 24 * 60 * 60 * 1000, // 24 hours
           healthCheckInterval: 30000, // 30 seconds
@@ -130,10 +127,7 @@ export class QueueFactory {
       throw new Error("maxInMemoryAge must be at least 1000ms");
     }
 
-    if (
-      config.healthCheckInterval !== undefined &&
-      config.healthCheckInterval < 100
-    ) {
+    if (config.healthCheckInterval !== undefined && config.healthCheckInterval < 100) {
       throw new Error("healthCheckInterval must be at least 100ms");
     }
 
@@ -143,9 +137,7 @@ export class QueueFactory {
       config.backend === "sqlite"
     ) {
       if (!config.databaseUrl) {
-        throw new Error(
-          `databaseUrl is required for ${config.backend} backend`
-        );
+        throw new Error(`databaseUrl is required for ${config.backend} backend`);
       }
     }
   }

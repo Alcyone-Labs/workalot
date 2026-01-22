@@ -64,11 +64,10 @@ describe.skipIf(!REDIS_AVAILABLE)("Redis Queue", () => {
       const jobId = await queue.addJob(jobPayload);
 
       // Update to processing
-      await queue.updateJobStatus(
-        jobId,
-        JobStatus.PROCESSING,
-        { workerId: 1, startedAt: Date.now() }
-      );
+      await queue.updateJobStatus(jobId, JobStatus.PROCESSING, {
+        workerId: 1,
+        startedAt: Date.now(),
+      });
 
       const job = await queue.getJob(jobId);
       expect(job?.status).toBe(JobStatus.PROCESSING);
@@ -85,19 +84,18 @@ describe.skipIf(!REDIS_AVAILABLE)("Redis Queue", () => {
       const jobId = await queue.addJob(jobPayload);
 
       // Mark as processing first
-      await queue.updateJobStatus(
-        jobId,
-        JobStatus.PROCESSING,
-        { workerId: 1, startedAt: Date.now() }
-      );
+      await queue.updateJobStatus(jobId, JobStatus.PROCESSING, {
+        workerId: 1,
+        startedAt: Date.now(),
+      });
 
       // Complete the job
       const results = { success: true, message: "Test completed" };
-      await queue.updateJobStatus(
-        jobId,
-        JobStatus.COMPLETED,
-        { results, executionTime: 100, queueTime: 50 }
-      );
+      await queue.updateJobStatus(jobId, JobStatus.COMPLETED, {
+        results,
+        executionTime: 100,
+        queueTime: 50,
+      });
 
       const job = await queue.getJob(jobId);
       expect(job?.status).toBe(JobStatus.COMPLETED);
@@ -114,19 +112,14 @@ describe.skipIf(!REDIS_AVAILABLE)("Redis Queue", () => {
       const jobId = await queue.addJob(jobPayload);
 
       // Mark as processing
-      await queue.updateJobStatus(
-        jobId,
-        JobStatus.PROCESSING,
-        { workerId: 1, startedAt: Date.now() }
-      );
+      await queue.updateJobStatus(jobId, JobStatus.PROCESSING, {
+        workerId: 1,
+        startedAt: Date.now(),
+      });
 
       // Fail the job
       const error = "Test error";
-      await queue.updateJobStatus(
-        jobId,
-        JobStatus.FAILED,
-        { error }
-      );
+      await queue.updateJobStatus(jobId, JobStatus.FAILED, { error });
 
       const job = await queue.getJob(jobId);
       expect(job?.status).toBe(JobStatus.FAILED);
@@ -275,4 +268,3 @@ describe.skipIf(!REDIS_AVAILABLE)("Redis Queue", () => {
     });
   });
 });
-

@@ -1,8 +1,8 @@
 // Main TaskManager class
-export { TaskManager, type TaskManagerEvents } from './TaskManager.js';
+export { TaskManager, type TaskManagerEvents } from "./TaskManager.js";
 
 // Singleton wrapper
-export { TaskManagerSingleton, taskManager } from './TaskManagerSingleton.js';
+export { TaskManagerSingleton, taskManager } from "./TaskManagerSingleton.js";
 
 // Convenience functions (main API)
 export {
@@ -19,5 +19,5 @@ export {
   getJobsByStatus,
   shutdown,
   getTaskManager,
-  isInitialized
-} from './functions.js';
+  isInitialized,
+} from "./functions.js";

@@ -72,10 +72,7 @@ export const DIFFICULTY_PRESETS = {
 
 export type DifficultyLevel = keyof typeof DIFFICULTY_PRESETS;
 
-export function scaleTaskTypes(
-  taskTypes: TaskType[],
-  difficulty: number
-): TaskType[] {
+export function scaleTaskTypes(taskTypes: TaskType[], difficulty: number): TaskType[] {
   return taskTypes.map((taskType) => ({
     ...taskType,
     cpuCycles: Math.max(50000, Math.round(taskType.cpuCycles * difficulty)),

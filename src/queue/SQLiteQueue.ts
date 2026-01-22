@@ -1,10 +1,10 @@
-import { EventEmitter } from 'node:events';
-import { readFile } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { ulid } from 'ulidx';
-import { QueueItem, JobStatus, JobPayload, JobResult, QueueConfig } from '../types/index.js';
-import { IQueueBackend, QueueStats } from './IQueueBackend.js';
+import { EventEmitter } from "node:events";
+import { readFile } from "node:fs/promises";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { ulid } from "ulidx";
+import { QueueItem, JobStatus, JobPayload, JobResult, QueueConfig } from "../types/index.js";
+import { IQueueBackend, QueueStats } from "./IQueueBackend.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -19,15 +19,17 @@ async function initializeDatabase() {
 
   try {
     // Try Bun's native SQLite first
-    if (typeof (globalThis as any).Bun !== 'undefined') {
-      Database = (await import('bun:sqlite' as any)).Database;
+    if (typeof (globalThis as any).Bun !== "undefined") {
+      Database = (await import("bun:sqlite" as any)).Database;
       isBun = true;
     } else {
       // Fall back to better-sqlite3 for Node.js
-      Database = (await import('better-sqlite3')).default;
+      Database = (await import("better-sqlite3")).default;
     }
   } catch {
-    throw new Error('No SQLite driver available. Install better-sqlite3 for Node.js or use Bun runtime.');
+    throw new Error(
+      "No SQLite driver available. Install better-sqlite3 for Node.js or use Bun runtime.",
+    );
   }
 }
 
@@ -39,22 +41,22 @@ export interface SQLiteQueueConfig extends QueueConfig {
    * - './data/queue.db' for file-based database
    */
   databaseUrl?: string;
-  
+
   /**
    * Enable debug logging for database operations
    */
   debug?: boolean;
-  
+
   /**
    * Custom migration directory path
    */
   migrationsPath?: string;
-  
+
   /**
    * Auto-run migrations on initialization
    */
   autoMigrate?: boolean;
-  
+
   /**
    * Enable WAL mode for better performance
    */
@@ -67,7 +69,7 @@ export interface SQLiteQueueConfig extends QueueConfig {
  */
 export class SQLiteQueue extends IQueueBackend {
   private db: any = null;
-  protected declare config: Required<SQLiteQueueConfig>;
+  declare protected config: Required<SQLiteQueueConfig>;
   private isInitialized = false;
   private isShuttingDown = false;
 
@@ -76,9 +78,9 @@ export class SQLiteQueue extends IQueueBackend {
 
     this.config = {
       ...this.getConfig(),
-      databaseUrl: config.databaseUrl || 'memory://',
+      databaseUrl: config.databaseUrl || "memory://",
       debug: config.debug || false,
-      migrationsPath: config.migrationsPath || join(__dirname, 'migrations', 'sqlite'),
+      migrationsPath: config.migrationsPath || join(__dirname, "migrations", "sqlite"),
       autoMigrate: config.autoMigrate !== false, // Default to true
       enableWAL: config.enableWAL !== false, // Default to true
     };
@@ -94,33 +96,36 @@ export class SQLiteQueue extends IQueueBackend {
       await initializeDatabase();
 
       if (this.config.debug) {
-        console.log('Creating SQLite instance...');
+        console.log("Creating SQLite instance...");
       }
 
       // Handle memory:// URL format
-      const dbPath = this.config.databaseUrl === 'memory://'
-        ? (isBun ? ':memory:' : ':memory:')
-        : this.config.databaseUrl;
+      const dbPath =
+        this.config.databaseUrl === "memory://"
+          ? isBun
+            ? ":memory:"
+            : ":memory:"
+          : this.config.databaseUrl;
 
       if (isBun) {
-        this.db = new Database(dbPath, { 
+        this.db = new Database(dbPath, {
           create: true,
-          strict: true 
+          strict: true,
         });
       } else {
         this.db = new Database(dbPath);
       }
 
       if (this.config.debug) {
-        console.log('SQLite instance created successfully');
+        console.log("SQLite instance created successfully");
       }
 
       // Enable WAL mode for better performance
-      if (this.config.enableWAL && this.config.databaseUrl !== 'memory://') {
-        this.db.exec('PRAGMA journal_mode = WAL;');
-        this.db.exec('PRAGMA synchronous = NORMAL;');
-        this.db.exec('PRAGMA cache_size = 1000;');
-        this.db.exec('PRAGMA temp_store = memory;');
+      if (this.config.enableWAL && this.config.databaseUrl !== "memory://") {
+        this.db.exec("PRAGMA journal_mode = WAL;");
+        this.db.exec("PRAGMA synchronous = NORMAL;");
+        this.db.exec("PRAGMA cache_size = 1000;");
+        this.db.exec("PRAGMA temp_store = memory;");
       }
 
       // Run migrations if enabled
@@ -129,21 +134,21 @@ export class SQLiteQueue extends IQueueBackend {
       }
 
       this.isInitialized = true;
-      this.emit('ready');
+      this.emit("ready");
 
       if (this.config.debug) {
-        console.log('SQLite queue initialized successfully');
+        console.log("SQLite queue initialized successfully");
       }
     } catch (error) {
-      console.error('Failed to initialize SQLite queue:', error);
+      console.error("Failed to initialize SQLite queue:", error);
       throw error;
     }
   }
 
   private async runMigrations(): Promise<void> {
     try {
-      const migrationFile = join(this.config.migrationsPath, '001_initial_schema.sql');
-      const migrationSQL = await readFile(migrationFile, 'utf-8');
+      const migrationFile = join(this.config.migrationsPath, "001_initial_schema.sql");
+      const migrationSQL = await readFile(migrationFile, "utf-8");
 
       // Execute migration in a transaction
       // Both Bun's native SQLite and better-sqlite3 support the same transaction API
@@ -153,11 +158,11 @@ export class SQLiteQueue extends IQueueBackend {
       transaction();
 
       if (this.config.debug) {
-        console.log('SQLite migrations completed successfully');
+        console.log("SQLite migrations completed successfully");
       }
     } catch (error) {
       if (this.config.debug) {
-        console.log('Migration may have already been applied:', error);
+        console.log("Migration may have already been applied:", error);
       }
       // Migrations might already be applied, which is fine
     }
@@ -169,7 +174,7 @@ export class SQLiteQueue extends IQueueBackend {
 
   async addJob(jobPayload: JobPayload, customId?: string): Promise<string> {
     if (this.isShuttingDown) {
-      throw new Error('Queue is shutting down, cannot add new jobs');
+      throw new Error("Queue is shutting down, cannot add new jobs");
     }
 
     const id = customId || this.generateJobId();
@@ -179,7 +184,7 @@ export class SQLiteQueue extends IQueueBackend {
         INSERT INTO jobs (id, job_payload, status, requested_at)
         VALUES (?, ?, ?, datetime('now'))
       `);
-      
+
       if (isBun) {
         stmt.run(id, JSON.stringify(jobPayload), JobStatus.PENDING);
       } else {
@@ -188,7 +193,7 @@ export class SQLiteQueue extends IQueueBackend {
 
       return id;
     } catch (error: any) {
-      if (error.message && error.message.includes('UNIQUE constraint failed')) {
+      if (error.message && error.message.includes("UNIQUE constraint failed")) {
         throw new Error(`Job with ID ${id} already exists in queue`);
       }
       throw new Error(`Failed to add job: ${error.message || String(error)}`);
@@ -196,7 +201,7 @@ export class SQLiteQueue extends IQueueBackend {
   }
 
   async getJob(id: string): Promise<QueueItem | undefined> {
-    const stmt = this.db.prepare('SELECT * FROM jobs WHERE id = ?');
+    const stmt = this.db.prepare("SELECT * FROM jobs WHERE id = ?");
     const row = isBun ? stmt.get(id) : stmt.get(id);
 
     if (!row) {
@@ -226,40 +231,43 @@ export class SQLiteQueue extends IQueueBackend {
     status: JobStatus,
     result?: JobResult,
     error?: Error,
-    workerId?: number
+    workerId?: number,
   ): Promise<boolean> {
     try {
-      let sql = 'UPDATE jobs SET status = ?, last_updated = datetime(\'now\')';
+      let sql = "UPDATE jobs SET status = ?, last_updated = datetime('now')";
       const params: any[] = [status];
 
       if (status === JobStatus.PROCESSING) {
-        sql += ', started_at = datetime(\'now\')';
+        sql += ", started_at = datetime('now')";
         if (workerId !== undefined) {
-          sql += ', worker_id = ?';
+          sql += ", worker_id = ?";
           params.push(workerId);
         }
       } else if (status === JobStatus.COMPLETED || status === JobStatus.FAILED) {
         // Ensure started_at is set if not already (for CHECK constraint compliance)
-        sql += ', started_at = COALESCE(started_at, datetime(\'now\')), completed_at = datetime(\'now\')';
+        sql +=
+          ", started_at = COALESCE(started_at, datetime('now')), completed_at = datetime('now')";
         if (result) {
-          sql += ', result = ?';
+          sql += ", result = ?";
           params.push(JSON.stringify(result));
         }
         if (error) {
-          sql += ', error_message = ?, error_stack = ?';
-          params.push(error.message, error.stack || '');
+          sql += ", error_message = ?, error_stack = ?";
+          params.push(error.message, error.stack || "");
         }
       }
 
-      sql += ' WHERE id = ?';
+      sql += " WHERE id = ?";
       params.push(id);
 
       const stmt = this.db.prepare(sql);
       const result_info = isBun ? stmt.run(...params) : stmt.run(...params);
-      
+
       return (result_info.changes || 0) > 0;
     } catch (error) {
-      throw new Error(`Failed to update job status: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to update job status: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -308,12 +316,14 @@ export class SQLiteQueue extends IQueueBackend {
 
       return this.mapRowToQueueItem(row);
     } catch (error) {
-      throw new Error(`Failed to get next pending job: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to get next pending job: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
   async getJobsByStatus(status: JobStatus): Promise<QueueItem[]> {
-    const stmt = this.db.prepare('SELECT * FROM jobs WHERE status = ? ORDER BY requested_at ASC');
+    const stmt = this.db.prepare("SELECT * FROM jobs WHERE status = ? ORDER BY requested_at ASC");
     const rows = isBun ? stmt.all(status) : stmt.all(status);
 
     return rows.map((row: any) => this.mapRowToQueueItem(row));
@@ -357,19 +367,19 @@ export class SQLiteQueue extends IQueueBackend {
   }
 
   async hasPendingJobs(): Promise<boolean> {
-    const stmt = this.db.prepare('SELECT 1 FROM jobs WHERE status = ? LIMIT 1');
+    const stmt = this.db.prepare("SELECT 1 FROM jobs WHERE status = ? LIMIT 1");
     const row = isBun ? stmt.get(JobStatus.PENDING) : stmt.get(JobStatus.PENDING);
     return !!row;
   }
 
   async hasProcessingJobs(): Promise<boolean> {
-    const stmt = this.db.prepare('SELECT 1 FROM jobs WHERE status = ? LIMIT 1');
+    const stmt = this.db.prepare("SELECT 1 FROM jobs WHERE status = ? LIMIT 1");
     const row = isBun ? stmt.get(JobStatus.PROCESSING) : stmt.get(JobStatus.PROCESSING);
     return !!row;
   }
 
   async isEmpty(): Promise<boolean> {
-    const stmt = this.db.prepare('SELECT 1 FROM jobs LIMIT 1');
+    const stmt = this.db.prepare("SELECT 1 FROM jobs LIMIT 1");
     const row = isBun ? stmt.get() : stmt.get();
     return !row;
   }
@@ -443,14 +453,14 @@ export class SQLiteQueue extends IQueueBackend {
         }
       } catch (error) {
         if (this.config.debug) {
-          console.error('Error closing SQLite database:', error);
+          console.error("Error closing SQLite database:", error);
         }
       }
       this.db = null;
     }
 
     this.isInitialized = false;
-    this.emit('shutdown');
+    this.emit("shutdown");
   }
 
   // Optional: Batch job processing for better performance
@@ -496,14 +506,18 @@ export class SQLiteQueue extends IQueueBackend {
       const rows = transaction();
       return rows.map((row: any) => this.mapRowToQueueItem(row));
     } catch (error) {
-      throw new Error(`Failed to get next pending jobs: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to get next pending jobs: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
   // Optimized isIdle check for performance
   async isIdle(): Promise<boolean> {
-    const stmt = this.db.prepare('SELECT 1 FROM jobs WHERE status IN (?, ?) LIMIT 1');
-    const row = isBun ? stmt.get(JobStatus.PENDING, JobStatus.PROCESSING) : stmt.get(JobStatus.PENDING, JobStatus.PROCESSING);
+    const stmt = this.db.prepare("SELECT 1 FROM jobs WHERE status IN (?, ?) LIMIT 1");
+    const row = isBun
+      ? stmt.get(JobStatus.PENDING, JobStatus.PROCESSING)
+      : stmt.get(JobStatus.PENDING, JobStatus.PROCESSING);
     return !row;
   }
 }

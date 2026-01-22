@@ -86,7 +86,7 @@ export default class BatchProcessJob extends BaseJob implements IJob {
 
   private async processBatch(batch: any[]): Promise<any[]> {
     // Batch processing logic
-    return batch.map(item => ({ ...item, processed: true }));
+    return batch.map((item) => ({ ...item, processed: true }));
   }
 }
 ```
@@ -99,12 +99,10 @@ Use Promise.all for concurrent operations:
 export default class ParallelProcessJob extends BaseJob implements IJob {
   async run(payload: { urls: string[] }): Promise<any> {
     // Process all URLs in parallel
-    const results = await Promise.all(
-      payload.urls.map(url => this.fetchUrl(url))
-    );
+    const results = await Promise.all(payload.urls.map((url) => this.fetchUrl(url)));
 
-    const successes = results.filter(r => r.success);
-    const failures = results.filter(r => !r.success);
+    const successes = results.filter((r) => r.success);
+    const failures = results.filter((r) => !r.success);
 
     return this.success({
       total: payload.urls.length,
@@ -156,20 +154,17 @@ export default class RetryJob extends BaseJob implements IJob {
           const delay = this.BASE_DELAY * Math.pow(2, attempt - 1);
           console.warn(`Attempt ${attempt} failed, retrying in ${delay}ms`);
 
-          await new Promise(resolve => setTimeout(resolve, delay));
+          await new Promise((resolve) => setTimeout(resolve, delay));
         }
       }
     }
 
     // All retries failed
-    return this.error(
-      `Failed after ${this.MAX_RETRIES} attempts`,
-      {
-        endpoint: payload.endpoint,
-        lastError: lastError?.message,
-        attempts: this.MAX_RETRIES,
-      }
-    );
+    return this.error(`Failed after ${this.MAX_RETRIES} attempts`, {
+      endpoint: payload.endpoint,
+      lastError: lastError?.message,
+      attempts: this.MAX_RETRIES,
+    });
   }
 
   private async callEndpoint(endpoint: string): Promise<any> {
@@ -384,7 +379,9 @@ export default class ProgressiveLoadJob extends BaseJob {
           const progress = Math.round((loaded / payload.totalRecords) * 100);
           const elapsed = Date.now() - startTime;
 
-          console.log(`Checkpoint: ${loaded}/${payload.totalRecords} (${progress}%) in ${elapsed}ms`);
+          console.log(
+            `Checkpoint: ${loaded}/${payload.totalRecords} (${progress}%) in ${elapsed}ms`,
+          );
 
           lastCheckpoint = loaded;
         }
@@ -408,7 +405,7 @@ export default class ProgressiveLoadJob extends BaseJob {
   private async loadRecords(offset: number, limit: number): Promise<any[]> {
     // Data loading implementation
     // Simulate loading
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     return Array.from({ length: limit }, (_, i) => ({
       id: offset + i,

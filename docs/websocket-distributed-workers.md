@@ -65,7 +65,7 @@ class CustomWorker extends SimpleWorker {
       case WorkerMessageType.EXECUTE_JOB:
         await this.executeCustomJob(message.payload as JobPayload);
         break;
-      
+
       default:
         await super.handleMessage(message);
         break;

@@ -1,8 +1,5 @@
 import { EventEmitter } from "node:events";
-import {
-  WebSocketServer,
-  WebSocketConnection,
-} from "../communication/WebSocketServer.js";
+import { WebSocketServer, WebSocketConnection } from "../communication/WebSocketServer.js";
 import { IQueueBackend } from "../queue/IQueueBackend.js";
 import { QueueFactory } from "../queue/QueueFactory.js";
 import {
@@ -71,9 +68,7 @@ export class SimpleOrchestrator extends EventEmitter {
       this.queueBackend = this.config.queueBackend;
     } else {
       // Use static method to create queue
-      this.queueBackend = QueueFactory.createQueue(
-        this.config.queueConfig || {},
-      );
+      this.queueBackend = QueueFactory.createQueue(this.config.queueConfig || {});
     }
   }
 
@@ -114,10 +109,7 @@ export class SimpleOrchestrator extends EventEmitter {
 
     // Disconnect all workers
     for (const worker of this.workers.values()) {
-      if (
-        worker.connection.ws &&
-        typeof worker.connection.ws.close === "function"
-      ) {
+      if (worker.connection.ws && typeof worker.connection.ws.close === "function") {
         worker.connection.ws.close();
       }
     }
@@ -201,7 +193,7 @@ export class SimpleOrchestrator extends EventEmitter {
     this.wsServer.on("worker-ready", (data: { workerId: number; connectionId: string }) => {
       const workerId = data.workerId;
       const connection = this.wsServer.getConnection(data.connectionId);
-      
+
       if (connection) {
         // Create worker record if it doesn't exist
         if (!this.workers.has(workerId)) {
@@ -240,10 +232,7 @@ export class SimpleOrchestrator extends EventEmitter {
   /**
    * Handle messages from workers
    */
-  private async handleWorkerMessage(
-    workerId: number,
-    message: WorkerMessage,
-  ): Promise<void> {
+  private async handleWorkerMessage(workerId: number, message: WorkerMessage): Promise<void> {
     const worker = this.workers.get(workerId);
     if (!worker) return;
 
@@ -275,10 +264,7 @@ export class SimpleOrchestrator extends EventEmitter {
   /**
    * Handle job result from worker
    */
-  private async handleJobResult(
-    workerId: number,
-    result: JobResult,
-  ): Promise<void> {
+  private async handleJobResult(workerId: number, result: JobResult): Promise<void> {
     const worker = this.workers.get(workerId);
     if (!worker) return;
 
@@ -328,12 +314,12 @@ export class SimpleOrchestrator extends EventEmitter {
 
     worker.busy = true;
 
-// Send job to worker via WebSocketServer
-      this.wsServer.sendToWorker(workerId, {
-        type: WorkerMessageType.EXECUTE_JOB,
-        id: ulid(),
-        payload: job.jobPayload,
-      });
+    // Send job to worker via WebSocketServer
+    this.wsServer.sendToWorker(workerId, {
+      type: WorkerMessageType.EXECUTE_JOB,
+      id: ulid(),
+      payload: job.jobPayload,
+    });
 
     this.emit("job-assigned", workerId, job.id);
   }

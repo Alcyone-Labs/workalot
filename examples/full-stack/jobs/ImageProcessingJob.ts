@@ -60,20 +60,17 @@ export class ImageProcessingJob extends BaseJob {
 
   private async processOperation(
     operation: string,
-    payload: ImageProcessingPayload
+    payload: ImageProcessingPayload,
   ): Promise<void> {
     switch (operation) {
       case "resize":
         await this.simulateOperation(
           `Resizing to ${payload.width || 1920}x${payload.height || 1080}`,
-          800
+          800,
         );
         break;
       case "compress":
-        await this.simulateOperation(
-          `Compressing with quality ${payload.quality || 80}`,
-          600
-        );
+        await this.simulateOperation(`Compressing with quality ${payload.quality || 80}`, 600);
         break;
       case "grayscale":
         await this.simulateOperation("Converting to grayscale", 400);
@@ -92,10 +89,7 @@ export class ImageProcessingJob extends BaseJob {
     }
   }
 
-  private async simulateOperation(
-    description: string,
-    duration: number
-  ): Promise<void> {
+  private async simulateOperation(description: string, duration: number): Promise<void> {
     // In a real application, you would log progress here
     // console.log(`[ImageProcessing] ${description}...`);
     await new Promise((resolve) => setTimeout(resolve, duration));

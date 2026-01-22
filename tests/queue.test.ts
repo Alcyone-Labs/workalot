@@ -1,44 +1,37 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { unlink } from 'fs/promises';
-import { QueueManager } from '../src/queue/index.ts';
-import { JobStatus, JobPayload } from '../src/types/index.ts';
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { QueueManager } from "../src/queue/index.ts";
+import { JobStatus, JobPayload } from "../src/types/index.ts";
+import { getTempTsonFile } from "./test-utils.js";
 
-describe('Queue System', () => {
+describe("Queue System", () => {
   let queueManager: QueueManager;
   let testPersistenceFile: string;
 
   beforeEach(async () => {
-    // Use unique file name for each test to avoid conflicts
-    testPersistenceFile = `test-queue-state-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.tson`;
+    testPersistenceFile = getTempTsonFile("queue-state");
 
     queueManager = new QueueManager({
       persistenceFile: testPersistenceFile,
       maxInMemoryAge: 1000, // 1 second for testing
-      healthCheckInterval: 100 // 100ms for testing
+      healthCheckInterval: 100, // 100ms for testing
     });
     await queueManager.initialize();
   });
 
   afterEach(async () => {
     await queueManager.shutdown();
-    // Clean up test persistence file
-    try {
-      await unlink(testPersistenceFile);
-    } catch (error) {
-      // File might not exist, ignore
-    }
   });
 
-  describe('QueueManager', () => {
-    it('should add jobs to the queue', async () => {
+  describe("QueueManager", () => {
+    it("should add jobs to the queue", async () => {
       const jobPayload: JobPayload = {
-        jobFile: 'examples/PingJob.ts',
-        jobPayload: { test: 'data' }
+        jobFile: "examples/PingJob.ts",
+        jobPayload: { test: "data" },
       };
 
       const jobId = await queueManager.addJob(jobPayload);
       expect(jobId).toBeDefined();
-      expect(typeof jobId).toBe('string');
+      expect(typeof jobId).toBe("string");
 
       const job = await queueManager.getJob(jobId);
       expect(job).toBeDefined();
@@ -46,13 +39,13 @@ describe('Queue System', () => {
       expect(job?.jobPayload).toEqual(jobPayload);
     });
 
-    it('should add jobs with custom ID', async () => {
+    it("should add jobs with custom ID", async () => {
       const jobPayload: JobPayload = {
-        jobFile: 'examples/PingJob.ts',
-        jobPayload: { test: 'data' }
+        jobFile: "examples/PingJob.ts",
+        jobPayload: { test: "data" },
       };
 
-      const customId = 'custom-job-id';
+      const customId = "custom-job-id";
       const jobId = await queueManager.addJob(jobPayload, customId);
       expect(jobId).toBe(customId);
 
@@ -61,29 +54,36 @@ describe('Queue System', () => {
       expect(job?.id).toBe(customId);
     });
 
-    it('should reject duplicate job IDs', async () => {
+    it("should reject duplicate job IDs", async () => {
       const jobPayload: JobPayload = {
-        jobFile: 'examples/PingJob.ts',
-        jobPayload: { test: 'data' }
+        jobFile: "examples/PingJob.ts",
+        jobPayload: { test: "data" },
       };
 
-      const customId = 'duplicate-id';
+      const customId = "duplicate-id";
       await queueManager.addJob(jobPayload, customId);
 
-      await expect(queueManager.addJob(jobPayload, customId))
-        .rejects.toThrow('Job with ID duplicate-id already exists in queue');
+      await expect(queueManager.addJob(jobPayload, customId)).rejects.toThrow(
+        "Job with ID duplicate-id already exists in queue",
+      );
     });
 
-    it('should update job status', async () => {
+    it("should update job status", async () => {
       const jobPayload: JobPayload = {
-        jobFile: 'examples/PingJob.ts',
-        jobPayload: { test: 'data' }
+        jobFile: "examples/PingJob.ts",
+        jobPayload: { test: "data" },
       };
 
       const jobId = await queueManager.addJob(jobPayload);
-      
+
       // Update to processing
-      const updated = await queueManager.updateJobStatus(jobId, JobStatus.PROCESSING, undefined, undefined, 1);
+      const updated = await queueManager.updateJobStatus(
+        jobId,
+        JobStatus.PROCESSING,
+        undefined,
+        undefined,
+        1,
+      );
       expect(updated).toBe(true);
 
       const job = await queueManager.getJob(jobId);
@@ -92,18 +92,18 @@ describe('Queue System', () => {
       expect(job?.startedAt).toBeDefined();
     });
 
-    it('should complete jobs with results', async () => {
+    it("should complete jobs with results", async () => {
       const jobPayload: JobPayload = {
-        jobFile: 'examples/PingJob.ts',
-        jobPayload: { test: 'data' }
+        jobFile: "examples/PingJob.ts",
+        jobPayload: { test: "data" },
       };
 
       const jobId = await queueManager.addJob(jobPayload);
-      
+
       const result = {
-        results: { success: true, message: 'pong' },
+        results: { success: true, message: "pong" },
         executionTime: 100,
-        queueTime: 50
+        queueTime: 50,
       };
 
       await queueManager.updateJobStatus(jobId, JobStatus.COMPLETED, result);
@@ -114,14 +114,14 @@ describe('Queue System', () => {
       expect(job?.completedAt).toBeDefined();
     });
 
-    it('should fail jobs with errors', async () => {
+    it("should fail jobs with errors", async () => {
       const jobPayload: JobPayload = {
-        jobFile: 'examples/PingJob.ts',
-        jobPayload: { test: 'data' }
+        jobFile: "examples/PingJob.ts",
+        jobPayload: { test: "data" },
       };
 
       const jobId = await queueManager.addJob(jobPayload);
-      const error = new Error('Job failed');
+      const error = new Error("Job failed");
 
       await queueManager.updateJobStatus(jobId, JobStatus.FAILED, undefined, error);
 
@@ -131,15 +131,15 @@ describe('Queue System', () => {
       expect(job?.completedAt).toBeDefined();
     });
 
-    it('should get next pending job', async () => {
+    it("should get next pending job", async () => {
       const jobPayload1: JobPayload = {
-        jobFile: 'examples/PingJob.ts',
-        jobPayload: { test: 'data1' }
+        jobFile: "examples/PingJob.ts",
+        jobPayload: { test: "data1" },
       };
 
       const jobPayload2: JobPayload = {
-        jobFile: 'examples/PingJob.ts',
-        jobPayload: { test: 'data2' }
+        jobFile: "examples/PingJob.ts",
+        jobPayload: { test: "data2" },
       };
 
       const jobId1 = await queueManager.addJob(jobPayload1);
@@ -156,10 +156,10 @@ describe('Queue System', () => {
       expect(nextJob2?.id).toBe(jobId2); // Should get the second one
     });
 
-    it('should get jobs by status', async () => {
+    it("should get jobs by status", async () => {
       const jobPayload: JobPayload = {
-        jobFile: 'examples/PingJob.ts',
-        jobPayload: { test: 'data' }
+        jobFile: "examples/PingJob.ts",
+        jobPayload: { test: "data" },
       };
 
       const jobId1 = await queueManager.addJob(jobPayload);
@@ -177,10 +177,10 @@ describe('Queue System', () => {
       expect(processingJobs[0].id).toBe(jobId1);
     });
 
-    it('should get queue statistics', async () => {
+    it("should get queue statistics", async () => {
       const jobPayload: JobPayload = {
-        jobFile: 'examples/PingJob.ts',
-        jobPayload: { test: 'data' }
+        jobFile: "examples/PingJob.ts",
+        jobPayload: { test: "data" },
       };
 
       const jobId1 = await queueManager.addJob(jobPayload);
@@ -200,34 +200,34 @@ describe('Queue System', () => {
       expect(stats.oldestPending).toBeDefined();
     });
 
-    it('should check if queue has pending jobs', async () => {
+    it("should check if queue has pending jobs", async () => {
       expect(await queueManager.hasPendingJobs()).toBe(false);
 
       const jobPayload: JobPayload = {
-        jobFile: 'examples/PingJob.ts',
-        jobPayload: { test: 'data' }
+        jobFile: "examples/PingJob.ts",
+        jobPayload: { test: "data" },
       };
 
       await queueManager.addJob(jobPayload);
       expect(await queueManager.hasPendingJobs()).toBe(true);
     });
 
-    it('should check if queue is empty', async () => {
+    it("should check if queue is empty", async () => {
       expect(await queueManager.isEmpty()).toBe(true);
 
       const jobPayload: JobPayload = {
-        jobFile: 'examples/PingJob.ts',
-        jobPayload: { test: 'data' }
+        jobFile: "examples/PingJob.ts",
+        jobPayload: { test: "data" },
       };
 
       await queueManager.addJob(jobPayload);
       expect(await queueManager.isEmpty()).toBe(false);
     });
 
-    it('should clean up old completed jobs', async () => {
+    it("should clean up old completed jobs", async () => {
       const jobPayload: JobPayload = {
-        jobFile: 'examples/PingJob.ts',
-        jobPayload: { test: 'data' }
+        jobFile: "examples/PingJob.ts",
+        jobPayload: { test: "data" },
       };
 
       const jobId = await queueManager.addJob(jobPayload);
@@ -246,10 +246,10 @@ describe('Queue System', () => {
       expect(jobAfterCleanup).toBeUndefined();
     });
 
-    it('should persist and load queue state', async () => {
+    it("should persist and load queue state", async () => {
       const jobPayload: JobPayload = {
-        jobFile: 'examples/PingJob.ts',
-        jobPayload: { test: 'data' }
+        jobFile: "examples/PingJob.ts",
+        jobPayload: { test: "data" },
       };
 
       const jobId = await queueManager.addJob(jobPayload);
@@ -257,7 +257,7 @@ describe('Queue System', () => {
 
       // Create new queue manager and load state
       const newQueueManager = new QueueManager({
-        persistenceFile: testPersistenceFile
+        persistenceFile: testPersistenceFile,
       });
 
       const loadedCount = await newQueueManager.loadFromFile();
@@ -268,13 +268,6 @@ describe('Queue System', () => {
       expect(job?.jobPayload).toEqual(jobPayload);
 
       await newQueueManager.shutdown();
-
-      // Clean up the additional persistence file
-      try {
-        await unlink(testPersistenceFile);
-      } catch (error) {
-        // File might not exist, ignore
-      }
     });
   });
 });

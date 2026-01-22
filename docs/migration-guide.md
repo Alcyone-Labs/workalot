@@ -7,6 +7,7 @@ Starting with version 2.0.0, Workalot is transitioning from Node.js Worker threa
 ## Why the Change?
 
 The postMessage-based system had several limitations:
+
 - **Dual communication systems** created complexity and confusion
 - **Platform-specific** to Node.js Worker threads
 - **Limited scalability** for distributed systems
@@ -14,6 +15,7 @@ The postMessage-based system had several limitations:
 - **Testing complexity** due to Worker thread requirements
 
 The WebSocket-based approach provides:
+
 - **Unified communication** across all components
 - **Platform flexibility** (works in browsers, Deno, Bun, etc.)
 - **Better scalability** for distributed deployments
@@ -23,10 +25,12 @@ The WebSocket-based approach provides:
 ## Deprecation Notice
 
 ### Deprecated Components
+
 - `WorkerManager` (postMessage-based) - Will be removed in v3.0.0
 - `worker.ts` (Worker thread implementation) - Will be removed in v3.0.0
 
 ### Recommended Replacements
+
 - Use `WorkerManagerWS` instead of `WorkerManager`
 - Use `SimpleWorker` or `BaseWorker` with WebSocket communication
 - Use `SimpleOrchestrator` or `BaseOrchestrator` for orchestration
@@ -36,37 +40,39 @@ The WebSocket-based approach provides:
 ### Step 1: Update WorkerManager Usage
 
 #### Before (postMessage)
+
 ```typescript
-import { WorkerManager, QueueOrchestrator } from 'workalot';
+import { WorkerManager, QueueOrchestrator } from "workalot";
 
 const orchestrator = new QueueOrchestrator({
-  backend: 'sqlite',
-  databaseUrl: './queue.db'
+  backend: "sqlite",
+  databaseUrl: "./queue.db",
 });
 
 const workerManager = new WorkerManager(orchestrator, {
   numWorkers: 4,
   projectRoot: process.cwd(),
-  silent: false
+  silent: false,
 });
 
 await workerManager.initialize();
 
 // Execute job
 const result = await workerManager.executeJob({
-  id: 'job-1',
-  type: 'ProcessData',
-  payload: { data: 'test' }
+  id: "job-1",
+  type: "ProcessData",
+  payload: { data: "test" },
 });
 ```
 
 #### After (WebSocket)
+
 ```typescript
-import { WorkerManagerWS, QueueOrchestrator } from 'workalot';
+import { WorkerManagerWS, QueueOrchestrator } from "workalot";
 
 const orchestrator = new QueueOrchestrator({
-  backend: 'sqlite',
-  databaseUrl: './queue.db'
+  backend: "sqlite",
+  databaseUrl: "./queue.db",
 });
 
 const workerManager = new WorkerManagerWS(orchestrator, {
@@ -74,36 +80,38 @@ const workerManager = new WorkerManagerWS(orchestrator, {
   projectRoot: process.cwd(),
   silent: false,
   wsPort: 8080,
-  wsHostname: 'localhost'
+  wsHostname: "localhost",
 });
 
 await workerManager.initialize();
 
 // Execute job - API remains the same!
 const result = await workerManager.executeJob({
-  id: 'job-1',
-  type: 'ProcessData',
-  payload: { data: 'test' }
+  id: "job-1",
+  type: "ProcessData",
+  payload: { data: "test" },
 });
 ```
 
 ### Step 2: Create WebSocket Workers
 
 #### Before (Worker threads)
+
 Workers were automatically created by WorkerManager using Node.js Worker threads.
 
 #### After (WebSocket Workers)
+
 You need to explicitly create worker processes that connect via WebSocket:
 
 ```typescript
 // worker-process.ts
-import { SimpleWorker } from 'workalot';
+import { SimpleWorker } from "workalot";
 
 const worker = new SimpleWorker({
-  workerId: parseInt(process.env.WORKER_ID || '1'),
-  wsUrl: 'ws://localhost:8080/worker',
+  workerId: parseInt(process.env.WORKER_ID || "1"),
+  wsUrl: "ws://localhost:8080/worker",
   projectRoot: process.cwd(),
-  defaultTimeout: 30000
+  defaultTimeout: 30000,
 });
 
 // Start the worker
@@ -115,7 +123,7 @@ await worker.start();
 // 3. Report results back
 
 // Keep the process running
-process.on('SIGINT', async () => {
+process.on("SIGINT", async () => {
   await worker.stop();
   process.exit(0);
 });
@@ -126,33 +134,34 @@ process.on('SIGINT', async () => {
 For simpler use cases, consider using the new simplified components:
 
 #### Using SimpleOrchestrator and SimpleWorker
+
 ```typescript
 // orchestrator.ts
-import { SimpleOrchestrator } from 'workalot';
+import { SimpleOrchestrator } from "workalot";
 
 const orchestrator = new SimpleOrchestrator({
   wsPort: 8080,
   queueConfig: {
-    backend: 'sqlite',
-    databaseUrl: './queue.db'
-  }
+    backend: "sqlite",
+    databaseUrl: "./queue.db",
+  },
 });
 
 await orchestrator.start();
 
 // Add jobs
 await orchestrator.addJob({
-  id: 'job-1',
-  type: 'ProcessData',
-  payload: { data: 'test' }
+  id: "job-1",
+  type: "ProcessData",
+  payload: { data: "test" },
 });
 
 // worker.ts (separate process)
-import { SimpleWorker } from 'workalot';
+import { SimpleWorker } from "workalot";
 
 const worker = new SimpleWorker({
   workerId: 1,
-  wsUrl: 'ws://localhost:8080/worker'
+  wsUrl: "ws://localhost:8080/worker",
 });
 
 await worker.start();
@@ -163,38 +172,40 @@ await worker.start();
 If using the high-level TaskManager API, consider switching from singleton to factory pattern:
 
 #### Before (Singleton)
+
 ```typescript
-import { taskManager } from 'workalot';
+import { taskManager } from "workalot";
 
 await taskManager.initialize({
-  backend: 'sqlite',
-  databaseUrl: './queue.db'
+  backend: "sqlite",
+  databaseUrl: "./queue.db",
 });
 
 const result = await taskManager.scheduleAndWait({
-  type: 'ProcessData',
-  payload: { data: 'test' }
+  type: "ProcessData",
+  payload: { data: "test" },
 });
 
 await taskManager.shutdown();
 ```
 
 #### After (Factory - Recommended)
+
 ```typescript
-import { TaskManagerFactory } from 'workalot';
+import { TaskManagerFactory } from "workalot";
 
 const factory = new TaskManagerFactory();
-const taskManager = await factory.create('main', {
-  backend: 'sqlite',
-  databaseUrl: './queue.db'
+const taskManager = await factory.create("main", {
+  backend: "sqlite",
+  databaseUrl: "./queue.db",
 });
 
 const result = await taskManager.scheduleAndWait({
-  type: 'ProcessData',
-  payload: { data: 'test' }
+  type: "ProcessData",
+  payload: { data: "test" },
 });
 
-await factory.destroy('main');
+await factory.destroy("main");
 ```
 
 ## Configuration Changes
@@ -202,6 +213,7 @@ await factory.destroy('main');
 ### WorkerManager Configuration
 
 #### Old Configuration (postMessage)
+
 ```typescript
 interface WorkerManagerConfig {
   numWorkers?: number;
@@ -214,17 +226,18 @@ interface WorkerManagerConfig {
 ```
 
 #### New Configuration (WebSocket)
+
 ```typescript
 interface WorkerManagerConfig {
-  numWorkers?: number;        // Still supported
-  projectRoot?: string;        // Still supported
-  silent?: boolean;           // Still supported
-  wsPort?: number;            // NEW: WebSocket port
-  wsHostname?: string;        // NEW: WebSocket hostname
+  numWorkers?: number; // Still supported
+  projectRoot?: string; // Still supported
+  silent?: boolean; // Still supported
+  wsPort?: number; // NEW: WebSocket port
+  wsHostname?: string; // NEW: WebSocket hostname
   enableHealthCheck?: boolean; // NEW: Explicit health check toggle
   healthCheckInterval?: number; // Still supported
-  jobTimeout?: number;         // Still supported
-  batchTimeout?: number;       // Still supported
+  jobTimeout?: number; // Still supported
+  batchTimeout?: number; // Still supported
 }
 ```
 
@@ -235,30 +248,32 @@ interface WorkerManagerConfig {
 With WebSocket-based workers, you need to manage worker processes separately:
 
 #### Using PM2
+
 ```javascript
 // ecosystem.config.js
 module.exports = {
   apps: [
     {
-      name: 'orchestrator',
-      script: './dist/orchestrator.js',
-      instances: 1
+      name: "orchestrator",
+      script: "./dist/orchestrator.js",
+      instances: 1,
     },
     {
-      name: 'worker',
-      script: './dist/worker.js',
+      name: "worker",
+      script: "./dist/worker.js",
       instances: 4,
       env: {
-        WORKER_ID: '0'  // PM2 will increment this
-      }
-    }
-  ]
+        WORKER_ID: "0", // PM2 will increment this
+      },
+    },
+  ],
 };
 ```
 
 #### Using Docker Compose
+
 ```yaml
-version: '3.8'
+version: "3.8"
 
 services:
   orchestrator:
@@ -289,46 +304,50 @@ The WebSocket approach enables better scaling patterns:
 ## Testing Changes
 
 ### Before (Worker Threads)
+
 ```typescript
 // Testing was complex due to Worker thread requirements
-import { Worker } from 'worker_threads';
+import { Worker } from "worker_threads";
 
-jest.mock('worker_threads', () => ({
+jest.mock("worker_threads", () => ({
   Worker: jest.fn().mockImplementation(() => ({
     on: jest.fn(),
     postMessage: jest.fn(),
-    terminate: jest.fn()
-  }))
+    terminate: jest.fn(),
+  })),
 }));
 ```
 
 ### After (WebSocket)
+
 ```typescript
 // Testing is simpler with WebSocket mocks
-import { WebSocketServer } from 'workalot';
+import { WebSocketServer } from "workalot";
 
 // Use in-memory WebSocket for testing
 const testServer = new WebSocketServer({
   port: 0, // Random port
-  hostname: 'localhost'
+  hostname: "localhost",
 });
 
 // Or use SimpleWorker in-process for testing
 const worker = new SimpleWorker({
   workerId: 1,
-  wsUrl: 'ws://localhost:8080/test'
+  wsUrl: "ws://localhost:8080/test",
 });
 ```
 
 ## Benefits of Migration
 
 ### Immediate Benefits
+
 - **Consistent API**: Same communication pattern everywhere
 - **Better debugging**: WebSocket traffic can be inspected with standard tools
 - **Platform flexibility**: Not tied to Node.js Worker threads
 - **Simplified testing**: No Worker thread mocking complexity
 
 ### Future Benefits
+
 - **Distributed workers**: Run workers on different machines/containers
 - **Browser support**: Potential for browser-based workers
 - **Protocol extensions**: Easy to add custom message types
@@ -342,7 +361,7 @@ If you need to maintain both systems during migration:
 
 ```typescript
 // Use environment variable to switch
-const useWebSocket = process.env.USE_WEBSOCKET === 'true';
+const useWebSocket = process.env.USE_WEBSOCKET === "true";
 
 const manager = useWebSocket
   ? new WorkerManagerWS(orchestrator, config)
@@ -362,26 +381,29 @@ await manager.initialize();
 ## Common Issues and Solutions
 
 ### Issue 1: Workers Not Connecting
+
 ```typescript
 // Ensure orchestrator is started before workers
 await orchestrator.start();
 // Wait a moment for server to be ready
-await new Promise(resolve => setTimeout(resolve, 1000));
+await new Promise((resolve) => setTimeout(resolve, 1000));
 // Then start workers
 ```
 
 ### Issue 2: Connection Drops
+
 ```typescript
 // SimpleWorker has auto-reconnect enabled by default
 // For custom workers, ensure reconnection logic:
 const worker = new BaseWorker({
   // ... config
   enableAutoReconnect: true,
-  reconnectInterval: 5000
+  reconnectInterval: 5000,
 });
 ```
 
 ### Issue 3: Performance Differences
+
 ```typescript
 // WebSocket has slight overhead, batch operations for better performance
 const results = await workerManager.executeBatchJobs(jobs);

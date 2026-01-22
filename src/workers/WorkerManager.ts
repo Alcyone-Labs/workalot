@@ -1,8 +1,5 @@
 import { EventEmitter } from "node:events";
-import {
-  WebSocketServer,
-  WebSocketConnection,
-} from "../communication/WebSocketServer.js";
+import { WebSocketServer, WebSocketConnection } from "../communication/WebSocketServer.js";
 import { QueueOrchestrator } from "./QueueOrchestrator.js";
 import { JobExecutor } from "../jobs/JobExecutor.js";
 import {
@@ -90,10 +87,7 @@ export class WorkerManager extends EventEmitter {
   private nextWorkerId = 1;
   private projectRoot: string;
 
-  constructor(
-    queueOrchestrator: QueueOrchestrator,
-    config: WorkerManagerConfig = {}
-  ) {
+  constructor(queueOrchestrator: QueueOrchestrator, config: WorkerManagerConfig = {}) {
     super();
 
     this.queueOrchestrator = queueOrchestrator;
@@ -118,10 +112,7 @@ export class WorkerManager extends EventEmitter {
     });
 
     // Initialize job executor
-    this.jobExecutor = new JobExecutor(
-      this.projectRoot,
-      this.config.jobTimeout
-    );
+    this.jobExecutor = new JobExecutor(this.projectRoot, this.config.jobTimeout);
 
     this.setupWebSocketHandlers();
     this.setupOrchestratorEvents();
@@ -148,10 +139,10 @@ export class WorkerManager extends EventEmitter {
       }
 
       console.log(
-        `WorkerManager WebSocket server listening on ws://${this.config.wsHostname}:${this.config.wsPort}`
+        `WorkerManager WebSocket server listening on ws://${this.config.wsHostname}:${this.config.wsPort}`,
       );
       console.log(
-        `WorkerManager initialized with ${this.config.numWorkers} in-memory workers in Bun mode`
+        `WorkerManager initialized with ${this.config.numWorkers} in-memory workers in Bun mode`,
       );
     } else {
       // In Node.js environment, register workers directly without WebSocket
@@ -165,17 +156,14 @@ export class WorkerManager extends EventEmitter {
         this.queueOrchestrator.registerWorker(workerId);
       }
       console.log(
-        `WorkerManager initialized with ${this.config.numWorkers} workers in Node.js mode`
+        `WorkerManager initialized with ${this.config.numWorkers} workers in Node.js mode`,
       );
     }
 
     this.emit("initialized");
 
     // Start health check if enabled and in Bun environment
-    if (
-      this.config.enableHealthCheck &&
-      typeof globalThis.Bun !== "undefined"
-    ) {
+    if (this.config.enableHealthCheck && typeof globalThis.Bun !== "undefined") {
       this.startHealthCheck();
     }
 
@@ -203,14 +191,11 @@ export class WorkerManager extends EventEmitter {
       });
 
       // Set up connection handlers through the server
-      this.wsServer.on(
-        "message",
-        (data: { connectionId: string; message: WorkerMessage }) => {
-          if (data.connectionId === connection.id) {
-            this.handleWorkerMessage(workerId, data.message);
-          }
+      this.wsServer.on("message", (data: { connectionId: string; message: WorkerMessage }) => {
+        if (data.connectionId === connection.id) {
+          this.handleWorkerMessage(workerId, data.message);
         }
-      );
+      });
 
       this.wsServer.on("close", (data: { connectionId: string }) => {
         if (data.connectionId === connection.id) {
@@ -218,15 +203,12 @@ export class WorkerManager extends EventEmitter {
         }
       });
 
-      this.wsServer.on(
-        "error",
-        (data: { connectionId: string; error: Error }) => {
-          if (data.connectionId === connection.id) {
-            console.error(`Worker ${workerId} connection error:`, data.error);
-            this.emit("worker-error", workerId, data.error.message);
-          }
+      this.wsServer.on("error", (data: { connectionId: string; error: Error }) => {
+        if (data.connectionId === connection.id) {
+          console.error(`Worker ${workerId} connection error:`, data.error);
+          this.emit("worker-error", workerId, data.error.message);
         }
-      );
+      });
 
       // Send initialization message
       connection.ws.send({
@@ -254,19 +236,16 @@ export class WorkerManager extends EventEmitter {
     });
 
     // Handle job results from orchestrator
-    this.queueOrchestrator.on(
-      "job-result",
-      (jobId: string, result: JobResult) => {
-        const pending = this.pendingJobs.get(jobId);
-        if (pending) {
-          if (pending.timeout) {
-            clearTimeout(pending.timeout);
-          }
-          pending.resolve(result);
-          this.pendingJobs.delete(jobId);
+    this.queueOrchestrator.on("job-result", (jobId: string, result: JobResult) => {
+      const pending = this.pendingJobs.get(jobId);
+      if (pending) {
+        if (pending.timeout) {
+          clearTimeout(pending.timeout);
         }
+        pending.resolve(result);
+        this.pendingJobs.delete(jobId);
       }
-    );
+    });
 
     // Handle job errors from orchestrator
     this.queueOrchestrator.on("job-error", (jobId: string, error: Error) => {
@@ -300,10 +279,7 @@ export class WorkerManager extends EventEmitter {
         break;
 
       case WorkerMessageType.BATCH_RESULT:
-        this.handleBatchResult(
-          workerId,
-          message.payload as BatchExecutionResult
-        );
+        this.handleBatchResult(workerId, message.payload as BatchExecutionResult);
         break;
 
       case WorkerMessageType.JOB_ERROR:
@@ -321,10 +297,7 @@ export class WorkerManager extends EventEmitter {
         break;
 
       default:
-        console.warn(
-          `Unknown message type from worker ${workerId}:`,
-          message.type
-        );
+        console.warn(`Unknown message type from worker ${workerId}:`, message.type);
     }
   }
 
@@ -355,9 +328,7 @@ export class WorkerManager extends EventEmitter {
 
     // Log if not shutting down
     if (!this.isShuttingDown) {
-      console.log(
-        `Worker ${workerId} disconnected. Waiting for reconnection...`
-      );
+      console.log(`Worker ${workerId} disconnected. Waiting for reconnection...`);
     }
   }
 
@@ -435,9 +406,7 @@ export class WorkerManager extends EventEmitter {
               workerState.currentJobId = undefined;
 
               // Emit job completion event
-              console.log(
-                `[WorkerManager] Emitting job-completed event for ${actualJobId}`
-              );
+              console.log(`[WorkerManager] Emitting job-completed event for ${actualJobId}`);
               this.emit("job-completed", actualJobId, result);
 
               // Resolve the job
@@ -453,19 +422,16 @@ export class WorkerManager extends EventEmitter {
               workerState.currentJobId = undefined;
 
               // Emit job failure event
-              const errorMessage =
-                error instanceof Error ? error.message : String(error);
+              const errorMessage = error instanceof Error ? error.message : String(error);
               console.log(
-                `[WorkerManager] Emitting job-failed event for ${actualJobId} with error: ${errorMessage}`
+                `[WorkerManager] Emitting job-failed event for ${actualJobId} with error: ${errorMessage}`,
               );
               this.emit("job-failed", actualJobId, errorMessage);
 
               // Reject the job
               const pending = this.pendingJobs.get(messageId);
               if (pending) {
-                pending.reject(
-                  error instanceof Error ? error : new Error(String(error))
-                );
+                pending.reject(error instanceof Error ? error : new Error(String(error)));
                 this.pendingJobs.delete(messageId);
               }
             });
@@ -474,11 +440,9 @@ export class WorkerManager extends EventEmitter {
     } else {
       // In Node.js environment, execute job directly
       console.log(
-        `[WorkerManager] Worker states: ${Array.from(
-          this.workerStates.entries()
-        )
+        `[WorkerManager] Worker states: ${Array.from(this.workerStates.entries())
           .map(([id, state]) => ({ id, busy: state.busy, ready: state.ready }))
-          .join(", ")}`
+          .join(", ")}`,
       );
       const workerId = this.getAvailableWorker();
       console.log(`[WorkerManager] Found available worker: ${workerId}`);
@@ -500,9 +464,7 @@ export class WorkerManager extends EventEmitter {
       const workerState = this.workerStates.get(workerId)!;
       workerState.busy = true;
       workerState.currentJobId = actualJobId;
-      console.log(
-        `[WorkerManager] Worker ${workerId} marked as busy for job ${actualJobId}`
-      );
+      console.log(`[WorkerManager] Worker ${workerId} marked as busy for job ${actualJobId}`);
 
       // Return a promise that resolves when the job completes
       return new Promise((resolve, reject) => {
@@ -511,18 +473,12 @@ export class WorkerManager extends EventEmitter {
           reject(new Error(`Job ${actualJobId} timed out`));
         }, jobPayload.jobTimeout || this.config.jobTimeout);
 
-        console.log(
-          `[WorkerManager] About to execute job with payload:`,
-          jobPayload
-        );
+        console.log(`[WorkerManager] About to execute job with payload:`, jobPayload);
         // Execute job and emit events for JobScheduler
         this.jobExecutor
           .executeJob(jobPayload, context)
           .then((result) => {
-            console.log(
-              `[WorkerManager] Job ${actualJobId} completed with result:`,
-              result
-            );
+            console.log(`[WorkerManager] Job ${actualJobId} completed with result:`, result);
             // Mark worker as available again
             workerState.busy = false;
             workerState.currentJobId = undefined;
@@ -531,18 +487,13 @@ export class WorkerManager extends EventEmitter {
             clearTimeout(timeout);
 
             // Emit job completion events for JobScheduler
-            console.log(
-              `[WorkerManager] Emitting job-completed event for ${actualJobId}`
-            );
+            console.log(`[WorkerManager] Emitting job-completed event for ${actualJobId}`);
             this.emit("job-completed", actualJobId, result);
 
             resolve(result);
           })
           .catch((error) => {
-            console.log(
-              `[WorkerManager] Job ${actualJobId} failed with error:`,
-              error
-            );
+            console.log(`[WorkerManager] Job ${actualJobId} failed with error:`, error);
             // Mark worker as available again
             workerState.busy = false;
             workerState.currentJobId = undefined;
@@ -551,10 +502,9 @@ export class WorkerManager extends EventEmitter {
             clearTimeout(timeout);
 
             // Emit job failure events for JobScheduler
-            const errorMessage =
-              error instanceof Error ? error.message : String(error);
+            const errorMessage = error instanceof Error ? error.message : String(error);
             console.log(
-              `[WorkerManager] Emitting job-failed event for ${actualJobId} with error: ${errorMessage}`
+              `[WorkerManager] Emitting job-failed event for ${actualJobId} with error: ${errorMessage}`,
             );
             this.emit("job-failed", actualJobId, errorMessage);
 
@@ -567,10 +517,7 @@ export class WorkerManager extends EventEmitter {
   /**
    * Execute a batch of jobs
    */
-  async executeBatchJobs(
-    jobs: JobPayload[],
-    jobIds?: string[]
-  ): Promise<BatchExecutionResult> {
+  async executeBatchJobs(jobs: JobPayload[], jobIds?: string[]): Promise<BatchExecutionResult> {
     // Check if we're running in Bun environment
     if (typeof globalThis.Bun !== "undefined") {
       const messageId = ulid();
@@ -645,10 +592,7 @@ export class WorkerManager extends EventEmitter {
                   timeout: jobs[i].jobTimeout || this.config.jobTimeout,
                 };
 
-                const result = await this.jobExecutor.executeJob(
-                  jobs[i],
-                  context
-                );
+                const result = await this.jobExecutor.executeJob(jobs[i], context);
                 jobResults.push({
                   jobId,
                   success: true,
@@ -659,8 +603,7 @@ export class WorkerManager extends EventEmitter {
                 // Emit job-completed event for JobScheduler
                 this.emit("job-completed", jobId, result);
               } catch (error) {
-                const errorMessage =
-                  error instanceof Error ? error.message : String(error);
+                const errorMessage = error instanceof Error ? error.message : String(error);
                 jobResults.push({
                   jobId,
                   success: false,
@@ -846,10 +789,7 @@ export class WorkerManager extends EventEmitter {
   /**
    * Handle batch result from worker
    */
-  private handleBatchResult(
-    workerId: number,
-    result: BatchExecutionResult
-  ): void {
+  private handleBatchResult(workerId: number, result: BatchExecutionResult): void {
     const workerState = this.workerStates.get(workerId);
     if (!workerState) return;
 

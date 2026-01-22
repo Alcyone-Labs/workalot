@@ -8,10 +8,7 @@ export class TimeSeriesJob extends BaseJob {
     super("TimeSeriesJob");
   }
 
-  async run(
-    payload: { id: number; timestamp: Date; data: any },
-    context: any
-  ): Promise<any> {
+  async run(payload: { id: number; timestamp: Date; data: any }, context: any): Promise<any> {
     // Validate required fields
     if (!payload.id || !payload.timestamp || !payload.data) {
       throw new Error("Missing required fields: id, timestamp, or data");

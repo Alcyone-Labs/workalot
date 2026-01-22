@@ -18,21 +18,15 @@ describe("Job System", () => {
     });
 
     it("should load a valid job file", async () => {
-      const job = await jobLoader.loadJob(
-        "./tests/fixtures/SimpleTestJob.ts",
-      );
+      const job = await jobLoader.loadJob("./tests/fixtures/SimpleTestJob.ts");
       expect(job).toBeDefined();
       expect(typeof job.run).toBe("function");
       expect(typeof job.getJobId).toBe("function");
     });
 
     it("should cache loaded jobs", async () => {
-      const job1 = await jobLoader.loadJob(
-        "./tests/fixtures/SimpleTestJob.ts",
-      );
-      const job2 = await jobLoader.loadJob(
-        "./tests/fixtures/SimpleTestJob.ts",
-      );
+      const job1 = await jobLoader.loadJob("./tests/fixtures/SimpleTestJob.ts");
+      const job2 = await jobLoader.loadJob("./tests/fixtures/SimpleTestJob.ts");
       expect(job1).toBe(job2);
     });
 
@@ -64,7 +58,7 @@ describe("Job System", () => {
         timeout: 5000,
         scheduleAndWait: async () => Promise.resolve(""),
         schedule: () => "",
-        _schedulingRequests: []
+        _schedulingRequests: [],
       };
       const result = await jobLoader.executeJob(
         {
@@ -98,7 +92,7 @@ describe("Job System", () => {
         timeout: 5000,
         scheduleAndWait: async () => Promise.resolve(""),
         schedule: () => "",
-        _schedulingRequests: []
+        _schedulingRequests: [],
       };
       const result = await jobExecutor.executeJob(jobPayload, context);
 
@@ -119,7 +113,7 @@ describe("Job System", () => {
         timeout: 5000,
         scheduleAndWait: async () => Promise.resolve(""),
         schedule: () => "",
-        _schedulingRequests: []
+        _schedulingRequests: [],
       };
       const result = await jobExecutor.executeJob(jobPayload, context);
 
@@ -140,7 +134,7 @@ describe("Job System", () => {
         timeout: 100,
         scheduleAndWait: async () => Promise.resolve(""),
         schedule: () => "",
-        _schedulingRequests: []
+        _schedulingRequests: [],
       };
       await expect(jobExecutor.executeJob(jobPayload, context)).rejects.toThrow(
         /Job execution timed out/,

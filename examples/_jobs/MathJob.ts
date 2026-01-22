@@ -24,15 +24,10 @@ export class MathJob extends BaseJob {
         result = numbers.reduce((sum: number, num: number) => sum + num, 0);
         break;
       case "multiply":
-        result = numbers.reduce(
-          (product: number, num: number) => product * num,
-          1
-        );
+        result = numbers.reduce((product: number, num: number) => product * num, 1);
         break;
       case "average":
-        result =
-          numbers.reduce((sum: number, num: number) => sum + num, 0) /
-          numbers.length;
+        result = numbers.reduce((sum: number, num: number) => sum + num, 0) / numbers.length;
         break;
       default:
         throw new Error(`Unsupported operation: ${operation}`);

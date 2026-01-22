@@ -12,7 +12,7 @@ export class WorkflowJob extends BaseJob {
 
   async run(
     payload: Record<string, any>,
-    context: JobExecutionContext
+    context: JobExecutionContext,
   ): Promise<Record<string, any>> {
     this.validatePayload(payload, ["workflowType"]);
 
@@ -37,10 +37,8 @@ export class WorkflowJob extends BaseJob {
       }
     } catch (error) {
       return this.createErrorResult(
-        `Workflow failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-        { workflowType, data }
+        `Workflow failed: ${error instanceof Error ? error.message : String(error)}`,
+        { workflowType, data },
       );
     }
   }
@@ -48,10 +46,7 @@ export class WorkflowJob extends BaseJob {
   /**
    * Example: Data processing pipeline that schedules jobs sequentially
    */
-  private async runDataProcessingPipeline(
-    data: any,
-    context: JobExecutionContext
-  ) {
+  private async runDataProcessingPipeline(data: any, context: JobExecutionContext) {
     const results: any[] = [];
 
     // Step 1: Validate data (schedule for later execution)
@@ -103,10 +98,7 @@ export class WorkflowJob extends BaseJob {
   /**
    * Example: User onboarding workflow with parallel job execution
    */
-  private async runUserOnboardingWorkflow(
-    data: any,
-    context: JobExecutionContext
-  ) {
+  private async runUserOnboardingWorkflow(data: any, context: JobExecutionContext) {
     const { userId, email, preferences } = data;
 
     console.log(`  Onboarding user: ${userId}`);
@@ -161,16 +153,11 @@ export class WorkflowJob extends BaseJob {
   /**
    * Example: Batch processing workflow that schedules many jobs
    */
-  private async runBatchProcessingWorkflow(
-    data: any,
-    context: JobExecutionContext
-  ) {
+  private async runBatchProcessingWorkflow(data: any, context: JobExecutionContext) {
     const { batchSize = 5, items = [] } = data;
     const jobIds: string[] = [];
 
-    console.log(
-      `  Processing batch of ${items.length} items in chunks of ${batchSize}`
-    );
+    console.log(`  Processing batch of ${items.length} items in chunks of ${batchSize}`);
 
     // Schedule jobs for each batch
     for (let i = 0; i < items.length; i += batchSize) {

@@ -11,7 +11,9 @@
 import { scheduleAndWait } from "#/index.js";
 
 test("test 1", async () => {
-  const result = await scheduleAndWait({ /* job */ });
+  const result = await scheduleAndWait({
+    /* job */
+  });
   // Test 2 sees this job!
 });
 
@@ -129,6 +131,7 @@ const manager = await createTaskManager("prod", {
 **Issue**: Fixed in SQLiteQueue v2.0+ - now uses `db.transaction()` for both Bun and better-sqlite3.
 
 **Before fix (v2.0.0-alpha)**:
+
 ```typescript
 // BUGGY - Separate operations, not atomic
 const row = selectStmt.get(); // Job A
@@ -137,6 +140,7 @@ updateStmt.run(row.id); // Job A claimed
 ```
 
 **After fix (current)**:
+
 ```typescript
 // CORRECT - Atomic transaction
 const transaction = this.db.transaction(() => {

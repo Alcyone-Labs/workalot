@@ -55,7 +55,7 @@ for (let i = 1; i <= numWorkers; i++) {
 
 // Graceful shutdown
 async function shutdownWorkers(): Promise<void> {
-  await Promise.all(workers.map(w => w.shutdown()));
+  await Promise.all(workers.map((w) => w.shutdown()));
 }
 ```
 
@@ -120,9 +120,7 @@ class ResultCollector {
 
   async runBatch(jobRequests: JobRequest[]): Promise<any[]> {
     // Schedule all jobs
-    const jobIds = await Promise.all(
-      jobRequests.map(req => scheduleWith(manager, req))
-    );
+    const jobIds = await Promise.all(jobRequests.map((req) => scheduleWith(manager, req)));
 
     // Wait for all results with event listeners
     const results = await this.waitForResults(jobIds);
@@ -174,7 +172,7 @@ class WorkflowOrchestrator {
 
       // Wait for step completion via channel
       const stepComplete = await this.waitForChannelEvent(
-        `workflow/${step.workflowId}/step/${i + 1}/complete`
+        `workflow/${step.workflowId}/step/${i + 1}/complete`,
       );
 
       console.log(`Step ${i + 1} completed:`, stepComplete);
@@ -190,7 +188,12 @@ class WorkflowOrchestrator {
 
 // Usage
 const workflow = [
-  { workflowId: "wf-123", stepName: "extract", jobFile: "jobs/Extract.ts", data: { url: "https://..." } },
+  {
+    workflowId: "wf-123",
+    stepName: "extract",
+    jobFile: "jobs/Extract.ts",
+    data: { url: "https://..." },
+  },
   { workflowId: "wf-123", stepName: "transform", jobFile: "jobs/Transform.ts", data: {} },
   { workflowId: "wf-123", stepName: "load", jobFile: "jobs/Load.ts", data: {} },
 ];
@@ -281,11 +284,9 @@ class ResilientWorker extends SimpleWorker {
         this.reconnectAttempts++;
         const delay = 1000 * Math.pow(2, this.reconnectAttempts - 1);
 
-        console.warn(
-          `Connection attempt ${this.reconnectAttempts} failed, retrying in ${delay}ms`
-        );
+        console.warn(`Connection attempt ${this.reconnectAttempts} failed, retrying in ${delay}ms`);
 
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
 

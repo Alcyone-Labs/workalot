@@ -45,14 +45,14 @@ async function main() {
 
   const jobs: string[] = [];
   for (let i = 0; i < 10; i++) {
-const jobPayload = {
-        jobFile: "examples/TimeSeriesJob.ts",
-        jobPayload: {
-          id: i,
-          timestamp: new Date(Date.now() - i * 3600000), // Each job 1 hour apart
-          data: `Time-series data point ${i}`,
-        },
-      };
+    const jobPayload = {
+      jobFile: "examples/TimeSeriesJob.ts",
+      jobPayload: {
+        id: i,
+        timestamp: new Date(Date.now() - i * 3600000), // Each job 1 hour apart
+        data: `Time-series data point ${i}`,
+      },
+    };
 
     const jobId = await manager.schedule(jobPayload);
     jobs.push(jobId);

@@ -9,7 +9,7 @@ export class MetaEnvelopeExample {
    */
   static async exampleJobWithMetaEnvelope(
     payload: Record<string, any>,
-    context: JobExecutionContext
+    context: JobExecutionContext,
   ): Promise<Record<string, any>> {
     // Initialize meta envelope if not present
     if (!context.metaEnvelope) {
@@ -53,12 +53,10 @@ export class MetaEnvelopeExample {
    */
   static async subsequentJobWithMetaEnvelope(
     payload: Record<string, any>,
-    context: JobExecutionContext
+    context: JobExecutionContext,
   ): Promise<Record<string, any>> {
     if (!context.metaEnvelope) {
-      throw new Error(
-        "Meta envelope not found - this job should be part of a workflow"
-      );
+      throw new Error("Meta envelope not found - this job should be part of a workflow");
     }
 
     const workflowId = context.metaEnvelope.workflowId;
@@ -66,9 +64,7 @@ export class MetaEnvelopeExample {
     const previousResults = context.metaEnvelope.previousResults;
 
     console.log(`Processing step ${stepNumber} of workflow ${workflowId}`);
-    console.log(
-      `Previous results: ${previousResults?.length || 0} steps completed`
-    );
+    console.log(`Previous results: ${previousResults?.length || 0} steps completed`);
 
     // Add current step to the envelope
     const currentStep = {

@@ -1,7 +1,7 @@
 /**
  * Manual test for PostgreSQL queue with postgres package
  * Run with: bun run tests/postgres-manual-test.ts
- * 
+ *
  * Prerequisites:
  * - Docker running
  * - Run: docker-compose up -d
@@ -45,11 +45,10 @@ async function testPostgreSQLQueue() {
 
     // Update job status
     console.log("5. Updating job status to completed...");
-    await queue.updateJobStatus(
-      jobId,
-      JobStatus.COMPLETED,
-      { success: true, message: "Test completed" }
-    );
+    await queue.updateJobStatus(jobId, JobStatus.COMPLETED, {
+      success: true,
+      message: "Test completed",
+    });
     console.log("✓ Job status updated\n");
 
     // Get stats
@@ -95,7 +94,6 @@ async function testPostgreSQLQueue() {
     }
 
     console.log("✅ All tests passed!");
-
   } catch (error) {
     console.error("❌ Test failed:", error);
     throw error;
@@ -112,4 +110,3 @@ testPostgreSQLQueue().catch((error) => {
   console.error("Fatal error:", error);
   process.exit(1);
 });
-

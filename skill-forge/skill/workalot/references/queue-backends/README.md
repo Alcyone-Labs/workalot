@@ -9,30 +9,35 @@ Workalot provides 5 pluggable queue backends with identical API - swap backends 
 ## When to Use Each Backend
 
 ### Memory Backend
+
 - **Use**: Development, testing, CI/CD, high-throughput temp processing
 - **Avoid**: Production persistence, distributed systems, restart scenarios
 - **Throughput**: 100,000+ jobs/sec
 - **Persistence**: ❌ No
 
 ### SQLite Backend
+
 - **Use**: Single-machine production, edge computing, embedded systems
 - **Avoid**: Multi-machine distributed, high-concurrency writes (>10 concurrent)
 - **Throughput**: 10,000-50,000 jobs/sec
 - **Persistence**: ✅ File-based
 
 ### PGLite Backend
+
 - **Use**: PostgreSQL compatibility testing, offline-first apps, serverless
 - **Avoid**: High-performance needs, production with large datasets
 - **Throughput**: 1,000-5,000 jobs/sec
 - **Persistence**: ✅ WASM-based
 
 ### PostgreSQL Backend
+
 - **Use**: Production distributed, enterprise HA, time-series processing
 - **Avoid**: Simple single-machine needs, low-resource environments
 - **Throughput**: 5,000-50,000 jobs/sec
 - **Persistence**: ✅ Server-based
 
 ### Redis Backend
+
 - **Use**: High-throughput distributed, edge computing (Upstash), microservices
 - **Avoid**: Large data payloads (>1MB), strict persistence requirements
 - **Throughput**: 10,000-50,000 jobs/sec
@@ -64,6 +69,7 @@ const config = {
 ```
 
 **Optimizations**:
+
 - No database setup
 - Microsecond latency
 - Perfect for unit tests
@@ -86,6 +92,7 @@ const config = {
 ```
 
 **Optimizations**:
+
 - WAL mode for concurrent reads/writes
 - Batch operations for bulk jobs
 - Regular VACUUM for compaction
@@ -105,6 +112,7 @@ const config = {
 ```
 
 **Caveats**:
+
 - 1-2 second startup time (WASM compilation)
 - Higher memory usage than SQLite
 - Experimental status
@@ -169,6 +177,7 @@ const config = {
 ```
 
 **Optimizations**:
+
 - Lua scripts for atomic operations
 - Sorted sets for priority queues
 - Pub/sub for real-time updates
@@ -176,12 +185,12 @@ const config = {
 
 ## Performance Comparison
 
-| Backend    | Throughput      | Latency  | Setup    | Edge Deploy | Best For         |
-| ---------- | --------------- | --------- | --------- | ----------- | ---------------- |
-| Memory     | 100,000+/s      | <1ms      | None      | ✅           | Dev/Test        |
-| SQLite     | 10,000-50,000/s | 1-5ms     | Minimal   | ✅           | Single server   |
-| PGLite     | 1,000-5,000/s   | 5-20ms    | Minimal   | ✅           | PG testing      |
-| PostgreSQL | 5,000-50,000/s  | 2-10ms    | Complex   | ❌           | Enterprise      |
-| Redis      | 10,000-50,000/s  | 1-3ms     | Medium    | ✅           | High perf/dist  |
+| Backend    | Throughput      | Latency | Setup   | Edge Deploy | Best For       |
+| ---------- | --------------- | ------- | ------- | ----------- | -------------- |
+| Memory     | 100,000+/s      | <1ms    | None    | ✅          | Dev/Test       |
+| SQLite     | 10,000-50,000/s | 1-5ms   | Minimal | ✅          | Single server  |
+| PGLite     | 1,000-5,000/s   | 5-20ms  | Minimal | ✅          | PG testing     |
+| PostgreSQL | 5,000-50,000/s  | 2-10ms  | Complex | ❌          | Enterprise     |
+| Redis      | 10,000-50,000/s | 1-3ms   | Medium  | ✅          | High perf/dist |
 
-*Benchmarks: MacBook Pro M1, 8 workers*
+_Benchmarks: MacBook Pro M1, 8 workers_

@@ -1,27 +1,21 @@
-import { EventEmitter } from 'node:events';
-import { IQueueBackend } from '../queue/IQueueBackend.js';
-import { QueueFactory } from '../queue/QueueFactory.js';
-import { JobScheduler } from '../workers/index.js';
-import {
-  JobPayload,
-  JobResult,
-  QueueConfig,
-  WhenFreeCallback,
-  JobStatus
-} from '../types/index.js';
+import { EventEmitter } from "node:events";
+import { IQueueBackend } from "../queue/IQueueBackend.js";
+import { QueueFactory } from "../queue/QueueFactory.js";
+import { JobScheduler } from "../workers/index.js";
+import { JobPayload, JobResult, QueueConfig, WhenFreeCallback, JobStatus } from "../types/index.js";
 
 /**
  * Events emitted by the TaskManager
  */
 export interface TaskManagerEvents {
-  'ready': () => void;
-  'job-scheduled': (jobId: string) => void;
-  'job-completed': (jobId: string, result: JobResult) => void;
-  'job-failed': (jobId: string, error: string) => void;
-  'queue-empty': () => void;
-  'queue-not-empty': () => void;
-  'all-workers-busy': () => void;
-  'workers-available': () => void;
+  ready: () => void;
+  "job-scheduled": (jobId: string) => void;
+  "job-completed": (jobId: string, result: JobResult) => void;
+  "job-failed": (jobId: string, error: string) => void;
+  "queue-empty": () => void;
+  "queue-not-empty": () => void;
+  "all-workers-busy": () => void;
+  "workers-available": () => void;
 }
 
 /**
@@ -55,13 +49,13 @@ export class TaskManager extends EventEmitter {
     try {
       await this.queueManager.initialize();
       await this.jobScheduler.initialize();
-      
+
       this.isInitialized = true;
-      this.emit('ready');
-      
-      console.log('TaskManager initialized successfully');
+      this.emit("ready");
+
+      console.log("TaskManager initialized successfully");
     } catch (error) {
-      console.error('Failed to initialize TaskManager:', error);
+      console.error("Failed to initialize TaskManager:", error);
       throw error;
     }
   }
@@ -74,18 +68,18 @@ export class TaskManager extends EventEmitter {
     this.ensureInitialized();
 
     if (this.isShuttingDown) {
-      throw new Error('TaskManager is shutting down');
+      throw new Error("TaskManager is shutting down");
     }
 
     try {
       const result = await this.jobScheduler.executeJobAndWait(jobPayload);
       return result;
     } catch (error) {
-      throw new Error(`Job execution failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Job execution failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
-
-
 
   /**
    * Register a callback to be called when the queue becomes free (no pending jobs)
@@ -94,8 +88,8 @@ export class TaskManager extends EventEmitter {
   whenFree(callback: WhenFreeCallback): void {
     this.ensureInitialized();
 
-    if (typeof callback !== 'function') {
-      throw new Error('Callback must be a function');
+    if (typeof callback !== "function") {
+      throw new Error("Callback must be a function");
     }
 
     this.whenFreeCallbacks.add(callback);
@@ -122,13 +116,13 @@ export class TaskManager extends EventEmitter {
     scheduler: any;
   }> {
     const stats = this.isInitialized ? await this.jobScheduler.getStats() : null;
-    
+
     return {
       isInitialized: this.isInitialized,
       isShuttingDown: this.isShuttingDown,
       queue: stats?.queue || null,
       workers: stats?.workers || null,
-      scheduler: stats ? { isProcessing: stats.isProcessing } : null
+      scheduler: stats ? { isProcessing: stats.isProcessing } : null,
     };
   }
 
@@ -179,24 +173,26 @@ export class TaskManager extends EventEmitter {
       }
 
       // Check if already idle
-      this.isIdle().then(idle => {
-        if (idle) {
-          if (timeoutHandle) clearTimeout(timeoutHandle);
-          resolve();
-          return;
-        }
+      this.isIdle()
+        .then((idle) => {
+          if (idle) {
+            if (timeoutHandle) clearTimeout(timeoutHandle);
+            resolve();
+            return;
+          }
 
-        // Set up callback to be called when idle
-        const callback = () => {
-          if (timeoutHandle) clearTimeout(timeoutHandle);
-          resolve();
-        };
+          // Set up callback to be called when idle
+          const callback = () => {
+            if (timeoutHandle) clearTimeout(timeoutHandle);
+            resolve();
+          };
 
-        this.whenFree(callback);
-      }).catch(error => {
-        if (timeoutHandle) clearTimeout(timeoutHandle);
-        reject(error);
-      });
+          this.whenFree(callback);
+        })
+        .catch((error) => {
+          if (timeoutHandle) clearTimeout(timeoutHandle);
+          reject(error);
+        });
     });
   }
 
@@ -211,20 +207,22 @@ export class TaskManager extends EventEmitter {
     // Convert string status to JobStatus enum
     let jobStatus: JobStatus;
     switch (status.toLowerCase()) {
-      case 'pending':
+      case "pending":
         jobStatus = JobStatus.PENDING;
         break;
-      case 'processing':
+      case "processing":
         jobStatus = JobStatus.PROCESSING;
         break;
-      case 'completed':
+      case "completed":
         jobStatus = JobStatus.COMPLETED;
         break;
-      case 'failed':
+      case "failed":
         jobStatus = JobStatus.FAILED;
         break;
       default:
-        throw new Error(`Invalid job status: ${status}. Valid statuses are: pending, processing, completed, failed`);
+        throw new Error(
+          `Invalid job status: ${status}. Valid statuses are: pending, processing, completed, failed`,
+        );
     }
 
     return await this.queueManager.getJobsByStatus(jobStatus);
@@ -237,13 +235,11 @@ export class TaskManager extends EventEmitter {
     this.ensureInitialized();
 
     if (this.isShuttingDown) {
-      throw new Error('TaskManager is shutting down');
+      throw new Error("TaskManager is shutting down");
     }
 
     return await this.jobScheduler.schedule(jobPayload);
   }
-
-
 
   /**
    * Graceful shutdown of the task manager
@@ -263,9 +259,9 @@ export class TaskManager extends EventEmitter {
       await this.jobScheduler.shutdown();
       await this.queueManager.shutdown();
 
-      console.log('TaskManager shut down successfully');
+      console.log("TaskManager shut down successfully");
     } catch (error) {
-      console.error('Error during TaskManager shutdown:', error);
+      console.error("Error during TaskManager shutdown:", error);
       throw error;
     }
   }
@@ -275,35 +271,35 @@ export class TaskManager extends EventEmitter {
    */
   private setupEventHandlers(): void {
     // Queue events
-    this.queueManager.on('queue-empty', () => {
-      this.emit('queue-empty');
+    this.queueManager.on("queue-empty", () => {
+      this.emit("queue-empty");
       this.checkAndCallWhenFreeCallbacks();
     });
 
-    this.queueManager.on('queue-not-empty', () => {
-      this.emit('queue-not-empty');
+    this.queueManager.on("queue-not-empty", () => {
+      this.emit("queue-not-empty");
     });
 
     // Job scheduler events
-    this.jobScheduler.on('job-scheduled', (jobId: string) => {
-      this.emit('job-scheduled', jobId);
+    this.jobScheduler.on("job-scheduled", (jobId: string) => {
+      this.emit("job-scheduled", jobId);
     });
 
-    this.jobScheduler.on('job-completed', (jobId: string, result: JobResult) => {
-      this.emit('job-completed', jobId, result);
+    this.jobScheduler.on("job-completed", (jobId: string, result: JobResult) => {
+      this.emit("job-completed", jobId, result);
       this.checkAndCallWhenFreeCallbacks();
     });
 
-    this.jobScheduler.on('job-failed', (jobId: string, error: string) => {
-      this.emit('job-failed', jobId, error);
+    this.jobScheduler.on("job-failed", (jobId: string, error: string) => {
+      this.emit("job-failed", jobId, error);
       this.checkAndCallWhenFreeCallbacks();
     });
 
-    this.jobScheduler.on('scheduler-idle', () => {
+    this.jobScheduler.on("scheduler-idle", () => {
       this.checkAndCallWhenFreeCallbacks();
     });
 
-    this.jobScheduler.on('scheduler-busy', () => {
+    this.jobScheduler.on("scheduler-busy", () => {
       // Could emit workers-busy event if needed
     });
   }
@@ -327,12 +323,12 @@ export class TaskManager extends EventEmitter {
           try {
             callback();
           } catch (error) {
-            console.error('Error in whenFree callback:', error);
+            console.error("Error in whenFree callback:", error);
           }
         }
       }
     } catch (error) {
-      console.error('Error checking idle state:', error);
+      console.error("Error checking idle state:", error);
     }
   }
 
@@ -341,7 +337,7 @@ export class TaskManager extends EventEmitter {
    */
   private ensureInitialized(): void {
     if (!this.isInitialized) {
-      throw new Error('TaskManager must be initialized before use. Call initialize() first.');
+      throw new Error("TaskManager must be initialized before use. Call initialize() first.");
     }
   }
 }

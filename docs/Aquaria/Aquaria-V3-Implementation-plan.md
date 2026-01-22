@@ -18,6 +18,7 @@ Aquaria V3 will be built as a workflow orchestration layer on top of Workalot V2
 ### Workalot V2 Responsibilities (Infrastructure Layer)
 
 **What Workalot V2 Provides:**
+
 - Job execution engine with BaseJob interface
 - Queue management (SQLite, PGLite, PostgreSQL, Memory backends)
 - Distributed worker management and health monitoring
@@ -27,6 +28,7 @@ Aquaria V3 will be built as a workflow orchestration layer on top of Workalot V2
 - Task scheduling APIs (scheduleAndWait, schedule)
 
 **Workalot V2 Scope:**
+
 - Low-level job distribution and execution
 - Worker thread/process management
 - Database queue operations
@@ -36,6 +38,7 @@ Aquaria V3 will be built as a workflow orchestration layer on top of Workalot V2
 ### Aquaria V3 Responsibilities (Workflow Layer)
 
 **What Aquaria V3 Adds:**
+
 - Workflow definition and execution (Steps, Paths, Workflows)
 - Event sourcing with replay/resume capabilities
 - Tool and MCP integration framework
@@ -46,6 +49,7 @@ Aquaria V3 will be built as a workflow orchestration layer on top of Workalot V2
 - Workflow-specific orchestration logic
 
 **Aquaria V3 Scope:**
+
 - High-level workflow composition and routing
 - AI-specific context and budget management
 - Tool calling and MCP server integration
@@ -79,7 +83,7 @@ class AquariaOrchestrator {
   private workalotManager: TaskManager;
   private eventStore: EventStore;
   private webSocketChannels: WebSocketChannelManager;
-  
+
   async executeWorkflow(workflow: WorkflowDefinition) {
     // Use Workalot for job scheduling
     // Add Aquaria-specific event sourcing
@@ -107,7 +111,7 @@ Bridge Workalot events to Aquaria event sourcing:
 
 ```typescript
 // Listen to Workalot events and transform to Aquaria events
-workalotManager.on('job-completed', (jobId, result) => {
+workalotManager.on("job-completed", (jobId, result) => {
   // Transform to Aquaria step:complete event
   // Store in event ledger
   // Trigger next workflow steps
@@ -119,7 +123,7 @@ workalotManager.on('job-completed', (jobId, result) => {
 ### Phase 1: Core Infrastructure Extensions
 
 1. **Extend Workalot WebSocket System**
-   - Add hierarchical channel support (jobs:*, workflows:*, service:*)
+   - Add hierarchical channel support (jobs:_, workflows:_, service:\*)
    - Implement pub/sub message routing
    - Add channel subscription management
 
@@ -217,7 +221,7 @@ src/aquaria/
 
 1. **Hierarchical WebSocket Channels**
    - Current: Basic worker communication
-   - Needed: jobs:*, workflows:*, service:* channel hierarchy
+   - Needed: jobs:_, workflows:_, service:\* channel hierarchy
    - Solution: Extend WebSocketServer with channel routing
 
 2. **Event Sourcing Infrastructure**
@@ -243,6 +247,7 @@ src/aquaria/
 ### Recommended Workalot V2 Extensions
 
 1. **Enhanced WebSocket System**
+
    ```typescript
    // Add to Workalot
    interface ChannelMessage {
@@ -254,6 +259,7 @@ src/aquaria/
    ```
 
 2. **Extended Job Context**
+
    ```typescript
    // Extend existing JobExecutionContext
    interface EnhancedJobExecutionContext extends JobExecutionContext {
@@ -275,30 +281,35 @@ src/aquaria/
 ## Development Phases
 
 ### Phase 1: Foundation (Weeks 1-2)
+
 - Extend Workalot WebSocket system for channels
 - Create AquariaStepJob wrapper
 - Implement basic event store
 - Set up project structure
 
 ### Phase 2: Core Engine (Weeks 3-4)
+
 - Build workflow definition system
 - Implement Aquaria orchestrator
 - Add meta envelope management
 - Create step execution framework
 
 ### Phase 3: Tool Integration (Weeks 5-6)
+
 - Implement tool registry and execution
 - Add MCP client integration
 - Create Oracle system foundation
 - Add tool calling to steps
 
 ### Phase 4: Advanced Features (Weeks 7-8)
+
 - Add pause/resume/abort controls
 - Implement parallel execution
 - Create workflow state persistence
 - Add comprehensive error handling
 
 ### Phase 5: Polish & Testing (Weeks 9-10)
+
 - Comprehensive testing suite
 - Performance optimization
 - Documentation and examples

@@ -1,5 +1,11 @@
 import { JobLoader, JobLoadError, JobValidationError } from "./JobLoader.js";
-import { JobPayload, JobResult, JobExecutionContext, JobSchedulingRequest, BaseJobExecutionContext } from "../types/index.js";
+import {
+  JobPayload,
+  JobResult,
+  JobExecutionContext,
+  JobSchedulingRequest,
+  BaseJobExecutionContext,
+} from "../types/index.js";
 import { ulid } from "ulidx";
 
 /**
@@ -26,8 +32,6 @@ export class JobExecutionError extends Error {
   }
 }
 
-
-
 /**
  * Handles job execution with timeout and error handling
  */
@@ -43,11 +47,7 @@ export class JobExecutor {
   /**
    * Executes a job with timeout and comprehensive error handling
    */
-  async executeJob(
-    jobPayload: JobPayload,
-    context: BaseJobExecutionContext,
-  ): Promise<JobResult> {
-
+  async executeJob(jobPayload: JobPayload, context: BaseJobExecutionContext): Promise<JobResult> {
     const { jobFile, jobPayload: payload, jobTimeout } = jobPayload;
     const timeout = jobTimeout || this.defaultTimeout;
     const startTime = Date.now();
@@ -84,10 +84,7 @@ export class JobExecutor {
         throw error;
       }
 
-      if (
-        error instanceof JobLoadError ||
-        error instanceof JobValidationError
-      ) {
+      if (error instanceof JobLoadError || error instanceof JobValidationError) {
         throw new JobExecutionError(
           `Job loading failed: ${error.message}`,
           jobFile.toString(),
@@ -118,7 +115,7 @@ export class JobExecutor {
       scheduleAndWait: async (jobPayload: JobPayload): Promise<string> => {
         const requestId = ulid();
         schedulingRequests.push({
-          type: 'scheduleAndWait',
+          type: "scheduleAndWait",
           jobPayload,
           requestId,
         });
@@ -129,14 +126,12 @@ export class JobExecutor {
       schedule: (jobPayload: JobPayload): string => {
         const requestId = ulid();
         schedulingRequests.push({
-          type: 'schedule',
+          type: "schedule",
           jobPayload,
           requestId,
         });
         return requestId;
       },
-
-
     };
   }
 
@@ -147,10 +142,7 @@ export class JobExecutor {
     try {
       return await this.jobLoader.getJobId(jobPayload);
     } catch (error) {
-      if (
-        error instanceof JobLoadError ||
-        error instanceof JobValidationError
-      ) {
+      if (error instanceof JobLoadError || error instanceof JobValidationError) {
         throw new JobExecutionError(
           `Failed to get job ID: ${error.message}`,
           jobPayload.jobFile.toString(),

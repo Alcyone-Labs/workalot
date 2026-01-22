@@ -129,9 +129,7 @@ export abstract class BaseOrchestrator extends EventEmitter {
 
     // Initialize queue backend if not provided
     if (!this.queueBackend && this.config.queueConfig) {
-      this.queueBackend = await QueueFactory.createQueue(
-        this.config.queueConfig,
-      );
+      this.queueBackend = await QueueFactory.createQueue(this.config.queueConfig);
       await this.queueBackend.initialize();
     }
 
@@ -239,10 +237,7 @@ export abstract class BaseOrchestrator extends EventEmitter {
   /**
    * Schedule a job
    */
-  async scheduleJob(
-    jobPayload: JobPayload,
-    customId?: string,
-  ): Promise<string> {
+  async scheduleJob(jobPayload: JobPayload, customId?: string): Promise<string> {
     // Call lifecycle hook for validation/transformation
     const transformedPayload = await this.beforeJobSchedule(jobPayload);
 
@@ -294,10 +289,7 @@ export abstract class BaseOrchestrator extends EventEmitter {
   /**
    * Execute a workflow step
    */
-  protected async executeWorkflowStep(
-    workflowId: string,
-    stepId: string,
-  ): Promise<void> {
+  protected async executeWorkflowStep(workflowId: string, stepId: string): Promise<void> {
     const workflow = this.workflows.get(workflowId);
     if (!workflow) {
       throw new Error(`Workflow ${workflowId} not found`);
@@ -462,10 +454,7 @@ export abstract class BaseOrchestrator extends EventEmitter {
   /**
    * Send jobs to a worker
    */
-  protected async sendJobsToWorker(
-    worker: WorkerState,
-    jobs: BatchJobContext[],
-  ): Promise<void> {
+  protected async sendJobsToWorker(worker: WorkerState, jobs: BatchJobContext[]): Promise<void> {
     const message: WorkerMessage = {
       type: WorkerMessageType.FILL_QUEUE,
       payload: { jobs } as FillQueuePayload,
@@ -489,8 +478,7 @@ export abstract class BaseOrchestrator extends EventEmitter {
   protected getWorkersNeedingJobs(): WorkerState[] {
     return Array.from(this.workers.values()).filter(
       (worker) =>
-        worker.status.needsMoreJobs &&
-        worker.status.pendingJobs < this.config.queueThreshold!,
+        worker.status.needsMoreJobs && worker.status.pendingJobs < this.config.queueThreshold!,
     );
   }
 
@@ -561,10 +549,7 @@ export abstract class BaseOrchestrator extends EventEmitter {
     const worker = this.workers.get(workerId);
     if (worker) {
       worker.pendingAcks.delete(jobId);
-      worker.status.processingJobs = Math.max(
-        0,
-        worker.status.processingJobs - 1,
-      );
+      worker.status.processingJobs = Math.max(0, worker.status.processingJobs - 1);
       worker.status.completedJobs++;
       worker.status.totalProcessed++;
     }
@@ -608,22 +593,14 @@ export abstract class BaseOrchestrator extends EventEmitter {
     const worker = this.workers.get(workerId);
     if (worker) {
       worker.pendingAcks.delete(jobId);
-      worker.status.processingJobs = Math.max(
-        0,
-        worker.status.processingJobs - 1,
-      );
+      worker.status.processingJobs = Math.max(0, worker.status.processingJobs - 1);
     }
 
     this.jobToWorkerMap.delete(jobId);
 
     // Update job status in queue
     if (this.queueBackend) {
-      await this.queueBackend.updateJobStatus(
-        jobId,
-        JobStatus.FAILED,
-        undefined,
-        new Error(error),
-      );
+      await this.queueBackend.updateJobStatus(jobId, JobStatus.FAILED, undefined, new Error(error));
     }
 
     // Send ACK to worker
@@ -681,9 +658,7 @@ export abstract class BaseOrchestrator extends EventEmitter {
    * Called before a job is scheduled
    * Can be used to validate or transform the job payload
    */
-  protected async beforeJobSchedule(
-    jobPayload: JobPayload,
-  ): Promise<JobPayload> {
+  protected async beforeJobSchedule(jobPayload: JobPayload): Promise<JobPayload> {
     // Override in subclass to validate/transform
     return jobPayload;
   }
@@ -691,10 +666,7 @@ export abstract class BaseOrchestrator extends EventEmitter {
   /**
    * Called after a job is scheduled
    */
-  protected async onJobScheduled(
-    jobId: string,
-    jobPayload: JobPayload,
-  ): Promise<void> {
+  protected async onJobScheduled(jobId: string, jobPayload: JobPayload): Promise<void> {
     // Override in subclass
   }
 
@@ -712,11 +684,7 @@ export abstract class BaseOrchestrator extends EventEmitter {
   /**
    * Called when a job fails
    */
-  protected async onJobFailed(
-    jobId: string,
-    error: Error,
-    workerId: number,
-  ): Promise<void> {
+  protected async onJobFailed(jobId: string, error: Error, workerId: number): Promise<void> {
     // Override in subclass
   }
 
@@ -724,9 +692,7 @@ export abstract class BaseOrchestrator extends EventEmitter {
    * Select a worker for a job
    * Override to implement custom worker selection logic
    */
-  protected async selectWorker(
-    context: JobDistributionContext,
-  ): Promise<WorkerState | null> {
+  protected async selectWorker(context: JobDistributionContext): Promise<WorkerState | null> {
     const { availableWorkers } = context;
 
     if (availableWorkers.length === 0) {
@@ -746,15 +712,11 @@ export abstract class BaseOrchestrator extends EventEmitter {
         );
 
       case "random":
-        return availableWorkers[
-          Math.floor(Math.random() * availableWorkers.length)
-        ];
+        return availableWorkers[Math.floor(Math.random() * availableWorkers.length)];
 
       case "custom":
         // Must be overridden in subclass
-        throw new Error(
-          "Custom distribution strategy requires overriding selectWorker method",
-        );
+        throw new Error("Custom distribution strategy requires overriding selectWorker method");
 
       default:
         return availableWorkers[0];
@@ -804,10 +766,7 @@ export abstract class BaseOrchestrator extends EventEmitter {
    */
   addMessageRoute(
     pattern: string | RegExp,
-    handler: (
-      connection: WebSocketConnection,
-      message: WorkerMessage,
-    ) => Promise<void> | void,
+    handler: (connection: WebSocketConnection, message: WorkerMessage) => Promise<void> | void,
     priority?: number,
   ): void {
     this.wsServer.registerRoute({

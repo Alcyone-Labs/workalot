@@ -18,10 +18,7 @@ interface BenchmarkResult {
   jobsPerSecond: number;
 }
 
-async function runBenchmark(
-  cores: number,
-  totalJobs: number
-): Promise<BenchmarkResult> {
+async function runBenchmark(cores: number, totalJobs: number): Promise<BenchmarkResult> {
   console.log(`\n🔥 Running: ${cores} cores, ${totalJobs} jobs`);
 
   const manager = new TaskManager({
@@ -83,9 +80,7 @@ async function main() {
   for (const jobCount of JOB_COUNTS) {
     for (const coreCount of CORES) {
       if (coreCount > cpus().length) {
-        console.log(
-          `⏭️  Skipping ${coreCount} cores (only ${cpus().length} available)`
-        );
+        console.log(`⏭️  Skipping ${coreCount} cores (only ${cpus().length} available)`);
         continue;
       }
 
@@ -111,7 +106,7 @@ async function main() {
         `${result.queueingTime.toString().padStart(10)}ms | ` +
         `${result.executionTime.toString().padStart(9)}ms | ` +
         `${result.totalTime.toString().padStart(10)}ms | ` +
-        `${result.jobsPerSecond.toString().padStart(8)}`
+        `${result.jobsPerSecond.toString().padStart(8)}`,
     );
   }
 
@@ -119,12 +114,10 @@ async function main() {
 
   // Find best performance
   const best = results.reduce((prev, curr) =>
-    curr.jobsPerSecond > prev.jobsPerSecond ? curr : prev
+    curr.jobsPerSecond > prev.jobsPerSecond ? curr : prev,
   );
 
-  console.log(
-    `\n🏆 Best: ${best.cores} cores, ${best.jobs} jobs → ${best.jobsPerSecond} jobs/sec`
-  );
+  console.log(`\n🏆 Best: ${best.cores} cores, ${best.jobs} jobs → ${best.jobsPerSecond} jobs/sec`);
 }
 
 main().catch(console.error);

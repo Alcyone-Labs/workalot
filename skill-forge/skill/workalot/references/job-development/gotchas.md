@@ -9,6 +9,7 @@
 **Symptoms**: `this.validatePayload is not a function`
 
 **Fix**:
+
 ```typescript
 // BAD - Doesn't extend BaseJob
 export class MyJob {
@@ -33,18 +34,17 @@ export default class MyJob extends BaseJob implements IJob {
 **Symptoms**: `Class does not correctly implement interface 'IJob'`
 
 **Fix**:
+
 ```typescript
 // BAD - Missing implements
 export default class MyJob extends BaseJob {
-  async run(payload: any): Promise<any> {
-  }
+  async run(payload: any): Promise<any> {}
 }
 
 // GOOD - Implements IJob
 import { BaseJob, IJob } from "#/jobs/BaseJob.js";
 export default class MyJob extends BaseJob implements IJob {
-  async run(payload: any): Promise<any> {
-  }
+  async run(payload: any): Promise<any> {}
 }
 ```
 
@@ -55,6 +55,7 @@ export default class MyJob extends BaseJob implements IJob {
 **Symptoms**: Queue stalls, high latency, poor throughput
 
 **Fix**:
+
 ```typescript
 // BAD - Synchronous file operations
 async run(payload: any): Promise<any> {
@@ -77,6 +78,7 @@ async run(payload: any): Promise<any> {
 **Symptoms**: Jobs run forever, queue stuck
 
 **Fix**:
+
 ```typescript
 // BAD - Infinite loop
 async run(payload: any): Promise<any> {
@@ -107,6 +109,7 @@ async run(payload: any): Promise<any> {
 **Symptoms**: Jobs fail with cryptic errors, unexpected behavior
 
 **Fix**:
+
 ```typescript
 // BAD - No validation
 async run(payload: any): Promise<any> {
@@ -133,6 +136,7 @@ async run(payload: any): Promise<any> {
 **Symptoms**: Memory usage grows, connection pool exhausted, file handles limit reached
 
 **Fix**:
+
 ```typescript
 // BAD - Resources never cleaned up
 async run(payload: any): Promise<any> {
@@ -167,6 +171,7 @@ async run(payload: any): Promise<any> {
 **Symptoms**: Later steps can't access previous step results
 
 **Fix**:
+
 ```typescript
 // BAD - Ignores meta envelope
 async run(payload: any, context?: JobExecutionContext): Promise<any> {
@@ -212,6 +217,7 @@ async run(payload: any, context?: JobExecutionContext): Promise<any> {
 **Symptoms**: Jobs marked as failed despite returning success
 
 **Fix**:
+
 ```typescript
 // BAD - Returns raw value
 async run(payload: any): Promise<any> {
@@ -233,6 +239,7 @@ async run(payload: any): Promise<any> {
 **Symptoms**: Worker crashes, job marked as timeout instead of failed
 
 **Fix**:
+
 ```typescript
 // BAD - Not catching errors
 async run(payload: any): Promise<any> {
@@ -264,6 +271,7 @@ async run(payload: any): Promise<any> {
 **Symptoms**: Vague failure reasons, hard to diagnose issues
 
 **Fix**:
+
 ```typescript
 // BAD - Generic error
 async run(payload: any): Promise<any> {
@@ -298,6 +306,7 @@ async run(payload: any): Promise<any> {
 **Symptoms**: Later workflow steps see modified data, unexpected behavior
 
 **Fix**:
+
 ```typescript
 // BAD - Mutates payload
 async run(payload: any): Promise<any> {
@@ -322,6 +331,7 @@ async run(payload: any): Promise<any> {
 **Symptoms**: No correlation tracking, missing timing data
 
 **Fix**:
+
 ```typescript
 // BAD - Ignores context parameter
 async run(payload: any): Promise<any> {
@@ -352,6 +362,7 @@ async run(payload: any, context?: JobExecutionContext): Promise<any> {
 **Symptoms**: High CPU usage from logging, slow jobs, disk I/O pressure
 
 **Fix**:
+
 ```typescript
 // BAD - Logs everything
 async run(payload: any): Promise<any> {
@@ -383,6 +394,7 @@ async run(payload: any): Promise<any> {
 **Symptoms**: Random ULIDs, no deduplication possible
 
 **Fix**:
+
 ```typescript
 // BAD - Default ULID job IDs
 async run(payload: any): Promise<any> {
@@ -410,6 +422,7 @@ export default class TrackedJob extends BaseJob implements IJob {
 **Symptoms**: Poor throughput, queue backlog grows
 
 **Fix**:
+
 ```typescript
 // BAD - Blocking loop
 async run(payload: { count: number }): Promise<any> {

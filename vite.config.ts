@@ -23,6 +23,8 @@ export default defineConfig({
         "path",
         "fs",
         "util",
+        "bun",
+        /^bun:.*/,
       ],
     },
     sourcemap: true,

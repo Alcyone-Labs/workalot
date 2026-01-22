@@ -1,15 +1,15 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { QueueOrchestrator } from '../src/workers/QueueOrchestrator.js';
-import { QueueManager } from '../src/queue/QueueManager.js';
-import { getTempTsonFile } from './test-utils.js';
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { QueueOrchestrator } from "../src/workers/QueueOrchestrator.js";
+import { QueueManager } from "../src/queue/QueueManager.js";
+import { getTempTsonFile } from "./test-utils.js";
 
-describe('QueueOrchestrator', () => {
+describe("QueueOrchestrator", () => {
   let orchestrator: QueueOrchestrator;
   let queueManager: QueueManager;
   let persistenceFile: string;
 
   beforeEach(async () => {
-    persistenceFile = getTempTsonFile('orch');
+    persistenceFile = getTempTsonFile("orch");
 
     queueManager = new QueueManager({
       persistenceFile,
@@ -24,37 +24,41 @@ describe('QueueOrchestrator', () => {
   afterEach(async () => {
     try {
       orchestrator.stop();
-    } catch { }
+    } catch {}
     try {
       await queueManager.shutdown();
-    } catch { }
+    } catch {}
   });
 
-  describe('Lifecycle', () => {
-    it('should start and stop correctly', () => {
+  describe("Lifecycle", () => {
+    it("should start and stop correctly", () => {
       orchestrator.start();
       orchestrator.stop();
     });
 
-    it('should emit events on start and stop', async () => {
+    it("should emit events on start and stop", async () => {
       let started = false;
       let stopped = false;
 
-      orchestrator.on('orchestrator-started', () => { started = true; });
-      orchestrator.on('orchestrator-stopped', () => { stopped = true; });
+      orchestrator.on("orchestrator-started", () => {
+        started = true;
+      });
+      orchestrator.on("orchestrator-stopped", () => {
+        stopped = true;
+      });
 
       orchestrator.start();
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       expect(started).toBe(true);
 
       orchestrator.stop();
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       expect(stopped).toBe(true);
     });
   });
 
-  describe('Worker Registration', () => {
-    it('should register workers', () => {
+  describe("Worker Registration", () => {
+    it("should register workers", () => {
       orchestrator.start();
       orchestrator.registerWorker(1);
       orchestrator.registerWorker(2);
@@ -63,7 +67,7 @@ describe('QueueOrchestrator', () => {
       expect(stats.totalWorkers).toBe(2);
     });
 
-    it('should unregister workers', () => {
+    it("should unregister workers", () => {
       orchestrator.start();
       orchestrator.registerWorker(1);
       orchestrator.unregisterWorker(1);
@@ -72,28 +76,30 @@ describe('QueueOrchestrator', () => {
       expect(stats.totalWorkers).toBe(0);
     });
 
-    it('should emit events on worker registration', () => {
+    it("should emit events on worker registration", () => {
       orchestrator.start();
       let workerRegistered = false;
-      orchestrator.on('worker-registered', () => { workerRegistered = true; });
+      orchestrator.on("worker-registered", () => {
+        workerRegistered = true;
+      });
       orchestrator.registerWorker(1);
       expect(workerRegistered).toBe(true);
     });
   });
 
-  describe('Statistics', () => {
-    it('should return correct statistics', () => {
+  describe("Statistics", () => {
+    it("should return correct statistics", () => {
       orchestrator.start();
       const stats = orchestrator.getStats();
 
-      expect(stats).toHaveProperty('totalWorkers');
-      expect(stats).toHaveProperty('activeWorkers');
-      expect(stats).toHaveProperty('totalPendingJobs');
-      expect(stats).toHaveProperty('totalProcessingJobs');
-      expect(stats).toHaveProperty('totalCompletedJobs');
+      expect(stats).toHaveProperty("totalWorkers");
+      expect(stats).toHaveProperty("activeWorkers");
+      expect(stats).toHaveProperty("totalPendingJobs");
+      expect(stats).toHaveProperty("totalProcessingJobs");
+      expect(stats).toHaveProperty("totalCompletedJobs");
     });
 
-    it('should track workers correctly', () => {
+    it("should track workers correctly", () => {
       orchestrator.start();
       orchestrator.registerWorker(1);
       orchestrator.registerWorker(2);
@@ -103,17 +109,19 @@ describe('QueueOrchestrator', () => {
     });
   });
 
-  describe('Job Distribution', () => {
-    it('should handle job results', () => {
+  describe("Job Distribution", () => {
+    it("should handle job results", () => {
       orchestrator.start();
       orchestrator.registerWorker(1);
 
       let jobResult = false;
-      orchestrator.on('job-result', () => { jobResult = true; });
+      orchestrator.on("job-result", () => {
+        jobResult = true;
+      });
 
       orchestrator.handleJobResult(1, {
         workerId: 1,
-        jobId: 'test-job',
+        jobId: "test-job",
         result: { results: { success: true }, executionTime: 100, queueTime: 50 },
         processingTime: 100,
       });
@@ -121,25 +129,27 @@ describe('QueueOrchestrator', () => {
       expect(jobResult).toBe(true);
     });
 
-    it('should acknowledge jobs', () => {
+    it("should acknowledge jobs", () => {
       orchestrator.start();
       orchestrator.registerWorker(1);
 
       let jobAck = false;
-      orchestrator.on('job-acknowledged', () => { jobAck = true; });
+      orchestrator.on("job-acknowledged", () => {
+        jobAck = true;
+      });
 
-      orchestrator.acknowledgeJob(1, 'test-job', () => {});
+      orchestrator.acknowledgeJob(1, "test-job", () => {});
       expect(jobAck).toBe(true);
     });
   });
 });
 
-describe('QueueOrchestrator Integration', () => {
+describe("QueueOrchestrator Integration", () => {
   let queueManager: QueueManager;
   let persistenceFile: string;
 
   beforeEach(async () => {
-    persistenceFile = getTempTsonFile('orch-int');
+    persistenceFile = getTempTsonFile("orch-int");
     queueManager = new QueueManager({
       persistenceFile,
       maxInMemoryAge: 1000,
@@ -151,10 +161,10 @@ describe('QueueOrchestrator Integration', () => {
   afterEach(async () => {
     try {
       await queueManager.shutdown();
-    } catch { }
+    } catch {}
   });
 
-  it('should handle multiple workers registering and unregistering', () => {
+  it("should handle multiple workers registering and unregistering", () => {
     const orchestrator = new QueueOrchestrator();
 
     orchestrator.start();
@@ -172,7 +182,7 @@ describe('QueueOrchestrator Integration', () => {
     orchestrator.stop();
   });
 
-  it('should track completed jobs correctly', () => {
+  it("should track completed jobs correctly", () => {
     const orchestrator = new QueueOrchestrator();
 
     orchestrator.start();
@@ -183,7 +193,7 @@ describe('QueueOrchestrator Integration', () => {
 
     orchestrator.handleJobResult(1, {
       workerId: 1,
-      jobId: 'job-1',
+      jobId: "job-1",
       result: { results: { success: true }, executionTime: 100, queueTime: 50 },
       processingTime: 100,
     });

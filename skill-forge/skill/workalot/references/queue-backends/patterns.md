@@ -180,11 +180,7 @@ setInterval(() => scalingQueue.adjustPoolSize(), 30000);
 Distributed Redis for horizontal scaling:
 
 ```typescript
-const redisNodes = [
-  "redis://node1:6379",
-  "redis://node2:6379",
-  "redis://node3:6379",
-];
+const redisNodes = ["redis://node1:6379", "redis://node2:6379", "redis://node3:6379"];
 
 // Distribute jobs across nodes
 async function scheduleDistributed(job: JobRequest): Promise<string> {
@@ -201,7 +197,7 @@ async function scheduleDistributed(job: JobRequest): Promise<string> {
 function hash(str: string): number {
   let hash = 0;
   for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash = (hash << 5) - hash + str.charCodeAt(i);
     hash |= 0;
   }
   return Math.abs(hash);
@@ -232,10 +228,13 @@ function backupSQLiteQueue(dbPath: string, backupPath: string): void {
 }
 
 // Run daily backups
-setInterval(() => {
-  const timestamp = new Date().toISOString().split("T")[0];
-  backupSQLiteQueue("./queue.db", `./backups/queue-${timestamp}.db`);
-}, 24 * 60 * 60 * 1000); // Daily
+setInterval(
+  () => {
+    const timestamp = new Date().toISOString().split("T")[0];
+    backupSQLiteQueue("./queue.db", `./backups/queue-${timestamp}.db`);
+  },
+  24 * 60 * 60 * 1000,
+); // Daily
 ```
 
 ## Monitoring Pattern
@@ -275,9 +274,7 @@ async function checkQueueHealth(queue: IQueueBackend): Promise<QueueHealth> {
     healthy,
     latency,
     queueDepth: stats.pending + stats.processing,
-    oldestJobAge: stats.oldestPending
-      ? Date.now() - stats.oldestPending.getTime()
-      : undefined,
+    oldestJobAge: stats.oldestPending ? Date.now() - stats.oldestPending.getTime() : undefined,
   };
 }
 ```
@@ -290,7 +287,7 @@ Exponential backoff for database connections:
 async function connectWithRetry<T>(
   connect: () => Promise<T>,
   maxRetries: number = 5,
-  baseDelay: number = 1000
+  baseDelay: number = 1000,
 ): Promise<T> {
   let lastError: Error | undefined;
 
@@ -301,12 +298,10 @@ async function connectWithRetry<T>(
       lastError = error instanceof Error ? error : new Error(String(error));
       const delay = baseDelay * Math.pow(2, attempt - 1);
 
-      console.warn(
-        `Connection attempt ${attempt}/${maxRetries} failed, retrying in ${delay}ms`
-      );
+      console.warn(`Connection attempt ${attempt}/${maxRetries} failed, retrying in ${delay}ms`);
 
       if (attempt < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
   }

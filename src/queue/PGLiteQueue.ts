@@ -1,13 +1,13 @@
-import { EventEmitter } from 'node:events';
-import { readFile } from 'node:fs/promises';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { ulid } from 'ulidx';
-import { QueueItem, JobStatus, JobPayload, JobResult, QueueConfig } from '../types/index.js';
-import { IQueueBackend, QueueStats } from './IQueueBackend.js';
-import { trace, SpanStatusCode, Span } from '@opentelemetry/api';
+import { EventEmitter } from "node:events";
+import { readFile } from "node:fs/promises";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { ulid } from "ulidx";
+import { QueueItem, JobStatus, JobPayload, JobResult, QueueConfig } from "../types/index.js";
+import { IQueueBackend, QueueStats } from "./IQueueBackend.js";
+import { trace, SpanStatusCode, Span } from "@opentelemetry/api";
 
-const tracer = trace.getTracer('workalot-queue');
+const tracer = trace.getTracer("workalot-queue");
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -21,10 +21,12 @@ async function initializePGLite() {
 
   try {
     // @ts-ignore - Dynamic import for optional dependency
-    const pgliteModule = await import('@electric-sql/pglite');
+    const pgliteModule = await import("@electric-sql/pglite");
     PGlite = pgliteModule.PGlite;
   } catch (error) {
-    throw new Error('PGLite is not installed. Install @electric-sql/pglite to use the PGLite backend.');
+    throw new Error(
+      "PGLite is not installed. Install @electric-sql/pglite to use the PGLite backend.",
+    );
   }
 }
 
@@ -79,22 +81,22 @@ export interface PGLiteQueueConfig extends QueueConfig {
    * - './data/queue.db' for file-based database
    */
   databaseUrl?: string;
-  
+
   /**
    * Maximum number of database connections in the pool
    */
   maxConnections?: number;
-  
+
   /**
    * Enable debug logging for database operations
    */
   debug?: boolean;
-  
+
   /**
    * Custom migration directory path
    */
   migrationsPath?: string;
-  
+
   /**
    * Auto-run migrations on initialization
    */
@@ -120,10 +122,10 @@ export class PGLiteQueue extends IQueueBackend {
 
     this.config = {
       ...this.getConfig(),
-      databaseUrl: config.databaseUrl || 'memory://',
+      databaseUrl: config.databaseUrl || "memory://",
       maxConnections: config.maxConnections || 10,
       debug: config.debug || false,
-      migrationsPath: config.migrationsPath || join(__dirname, 'migrations', 'pg'),
+      migrationsPath: config.migrationsPath || join(__dirname, "migrations", "pg"),
       autoMigrate: config.autoMigrate !== false, // Default to true
     };
 
@@ -143,7 +145,7 @@ export class PGLiteQueue extends IQueueBackend {
     await this.dbOperationQueue.execute(async () => {
       try {
         if (this.config.debug) {
-          console.log('Creating PGLite instance with debug mode enabled...');
+          console.log("Creating PGLite instance with debug mode enabled...");
         }
         this.db = await PGlite.create({
           dataDir: this.config.databaseUrl,
@@ -151,7 +153,7 @@ export class PGLiteQueue extends IQueueBackend {
           relaxedDurability: false, // Enforce stricter durability
         });
         if (this.config.debug) {
-          console.log('PGLite instance created successfully');
+          console.log("PGLite instance created successfully");
         }
 
         // Run migrations if enabled
@@ -165,40 +167,47 @@ export class PGLiteQueue extends IQueueBackend {
         this.isInitialized = true;
         console.log(`PGLiteQueue initialized with database: ${this.config.databaseUrl}`);
       } catch (error) {
-        throw new Error(`Failed to initialize PGLiteQueue: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Failed to initialize PGLiteQueue: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     });
   }
 
   async addJob(jobPayload: JobPayload, customId?: string): Promise<string> {
-    return tracer.startActiveSpan('PGLiteQueue.addJob', async (span) => {
+    return tracer.startActiveSpan("PGLiteQueue.addJob", async (span) => {
       if (this.isShuttingDown) {
-        span.recordException(new Error('Queue is shutting down'));
-        span.setStatus({ code: SpanStatusCode.ERROR, message: 'Queue is shutting down' });
+        span.recordException(new Error("Queue is shutting down"));
+        span.setStatus({ code: SpanStatusCode.ERROR, message: "Queue is shutting down" });
         span.end();
-        throw new Error('Queue is shutting down, cannot add new jobs');
+        throw new Error("Queue is shutting down, cannot add new jobs");
       }
 
       const id = customId || this.generateJobId();
-      span.setAttribute('job.id', id);
+      span.setAttribute("job.id", id);
 
       try {
         const result = await this.executeQueued(async () => {
           try {
-            await this.db!.query(`
+            await this.db!.query(
+              `
               INSERT INTO workalot_jobs (id, job_payload, status, requested_at)
               VALUES ($1, $2, $3, NOW())
-            `, [id, jobPayload, JobStatus.PENDING]);
+            `,
+              [id, jobPayload, JobStatus.PENDING],
+            );
 
             return id;
           } catch (error) {
-            if (error instanceof Error && error.message.includes('duplicate key')) {
+            if (error instanceof Error && error.message.includes("duplicate key")) {
               throw new Error(`Job with ID ${id} already exists in queue`);
             }
-            throw new Error(`Failed to add job: ${error instanceof Error ? error.message : String(error)}`);
+            throw new Error(
+              `Failed to add job: ${error instanceof Error ? error.message : String(error)}`,
+            );
           }
         });
-        
+
         span.setStatus({ code: SpanStatusCode.OK });
         return result;
       } catch (error) {
@@ -216,12 +225,15 @@ export class PGLiteQueue extends IQueueBackend {
       this.ensureInitialized();
 
       try {
-        const result = await this.db!.query(`
+        const result = await this.db!.query(
+          `
           SELECT id, job_payload, status, requested_at, started_at, completed_at,
                  last_updated, worker_id, result, error_message, error_stack
           FROM workalot_jobs 
           WHERE id = $1
-        `, [id]);
+        `,
+          [id],
+        );
 
         if (result.rows.length === 0) {
           return undefined;
@@ -229,7 +241,9 @@ export class PGLiteQueue extends IQueueBackend {
 
         return this.mapRowToQueueItem(result.rows[0]);
       } catch (error) {
-        throw new Error(`Failed to get job: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Failed to get job: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     });
   }
@@ -239,16 +253,16 @@ export class PGLiteQueue extends IQueueBackend {
     status: JobStatus,
     result?: JobResult,
     error?: Error,
-    workerId?: number
+    workerId?: number,
   ): Promise<boolean> {
-    return tracer.startActiveSpan('PGLiteQueue.updateJobStatus', async (span) => {
-      span.setAttribute('job.id', id);
-      span.setAttribute('job.status', status);
-      if (workerId) span.setAttribute('worker.id', workerId);
+    return tracer.startActiveSpan("PGLiteQueue.updateJobStatus", async (span) => {
+      span.setAttribute("job.id", id);
+      span.setAttribute("job.status", status);
+      if (workerId) span.setAttribute("worker.id", workerId);
 
       try {
         const opResult = await this.executeQueued(async () => {
-          const updateFields: string[] = ['status = $2', 'last_updated = NOW()'];
+          const updateFields: string[] = ["status = $2", "last_updated = NOW()"];
           const params: any[] = [id, status];
           let paramIndex = 3;
 
@@ -272,11 +286,11 @@ export class PGLiteQueue extends IQueueBackend {
               updateFields.push(`error_message = $${paramIndex++}`);
               updateFields.push(`error_stack = $${paramIndex++}`);
               params.push(error.message);
-              params.push(error.stack || '');
+              params.push(error.stack || "");
             }
           }
 
-          const query = `UPDATE workalot_jobs SET ${updateFields.join(', ')} WHERE id = $1`;
+          const query = `UPDATE workalot_jobs SET ${updateFields.join(", ")} WHERE id = $1`;
           if (this.config.debug) {
             console.log(`[PGLite DEBUG] Executing updateJobStatus query for job ${id}:`, query);
             console.log(`[PGLite DEBUG] Parameters:`, params);
@@ -285,7 +299,7 @@ export class PGLiteQueue extends IQueueBackend {
           try {
             const updateResult = await this.executeWithRetry(
               () => this.db!.query(query, params),
-              `updateJobStatus for job ${id}`
+              `updateJobStatus for job ${id}`,
             );
 
             if (this.config.debug) {
@@ -297,8 +311,13 @@ export class PGLiteQueue extends IQueueBackend {
             console.error(`[PGLite ERROR] Failed to update job ${id} status:`, error);
             console.error(`[PGLite ERROR] Query was:`, query);
             console.error(`[PGLite ERROR] Parameters were:`, params);
-            console.error(`[PGLite ERROR] Error stack:`, error instanceof Error ? error.stack : 'No stack trace');
-            throw new Error(`Failed to update job status: ${error instanceof Error ? error.message : String(error)}`);
+            console.error(
+              `[PGLite ERROR] Error stack:`,
+              error instanceof Error ? error.stack : "No stack trace",
+            );
+            throw new Error(
+              `Failed to update job status: ${error instanceof Error ? error.message : String(error)}`,
+            );
           }
         });
         span.setStatus({ code: SpanStatusCode.OK });
@@ -314,14 +333,17 @@ export class PGLiteQueue extends IQueueBackend {
   }
 
   async getNextPendingJob(): Promise<QueueItem | undefined> {
-    return tracer.startActiveSpan('PGLiteQueue.getNextPendingJob', async (span) => {
+    return tracer.startActiveSpan("PGLiteQueue.getNextPendingJob", async (span) => {
       try {
         const result = await this.executeQueued(async () => {
           try {
             // Use the stored function for atomic job claiming with row locking
-            const result = await this.db!.query(`
+            const result = await this.db!.query(
+              `
               SELECT * FROM get_next_pending_job($1)
-            `, [null]); // We'll add worker ID support later
+            `,
+              [null],
+            ); // We'll add worker ID support later
 
             if (result.rows.length === 0) {
               return undefined;
@@ -330,21 +352,24 @@ export class PGLiteQueue extends IQueueBackend {
             const row = result.rows[0] as any;
             const job = {
               id: row.id,
-              jobPayload: typeof row.job_payload === 'string' ? JSON.parse(row.job_payload) : row.job_payload,
+              jobPayload:
+                typeof row.job_payload === "string" ? JSON.parse(row.job_payload) : row.job_payload,
               status: row.status as JobStatus,
               requestedAt: new Date(row.requested_at),
               startedAt: new Date(), // Just started
               lastUpdated: new Date(),
               workerId: undefined, // Will be set by the caller
             };
-            
-            span.setAttribute('job.id', job.id);
+
+            span.setAttribute("job.id", job.id);
             return job;
           } catch (error) {
-            throw new Error(`Failed to get next pending job: ${error instanceof Error ? error.message : String(error)}`);
+            throw new Error(
+              `Failed to get next pending job: ${error instanceof Error ? error.message : String(error)}`,
+            );
           }
         });
-        
+
         span.setStatus({ code: SpanStatusCode.OK });
         return result;
       } catch (error) {
@@ -367,7 +392,9 @@ export class PGLiteQueue extends IQueueBackend {
       try {
         // Use a more efficient batch query to reduce database operations
         const result = await this.executeWithRetry(
-          () => this.db!.query(`
+          () =>
+            this.db!.query(
+              `
             UPDATE workalot_jobs
             SET status = 'processing', started_at = NOW(), last_updated = NOW()
             WHERE id IN (
@@ -381,13 +408,17 @@ export class PGLiteQueue extends IQueueBackend {
             RETURNING id, job_payload, status, requested_at, started_at,
                      completed_at, last_updated, worker_id, result,
                      error_message, error_stack
-          `, [count]),
-          `getNextPendingJobs batch of ${count}`
+          `,
+              [count],
+            ),
+          `getNextPendingJobs batch of ${count}`,
         );
 
         return (result as any).rows.map((row: any) => this.mapRowToQueueItem(row));
       } catch (error) {
-        throw new Error(`Failed to get next pending jobs: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Failed to get next pending jobs: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     });
   }
@@ -397,17 +428,22 @@ export class PGLiteQueue extends IQueueBackend {
       this.ensureInitialized();
 
       try {
-        const result = await this.db!.query(`
+        const result = await this.db!.query(
+          `
           SELECT id, job_payload, status, requested_at, started_at, completed_at,
                  last_updated, worker_id, result, error_message, error_stack
           FROM workalot_jobs 
           WHERE status = $1
           ORDER BY requested_at ASC
-        `, [status]);
+        `,
+          [status],
+        );
 
         return (result as any).rows.map((row: any) => this.mapRowToQueueItem(row));
       } catch (error) {
-        throw new Error(`Failed to get jobs by status: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Failed to get jobs by status: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     });
   }
@@ -417,7 +453,7 @@ export class PGLiteQueue extends IQueueBackend {
       this.ensureInitialized();
 
       try {
-        const result = await this.db!.query('SELECT * FROM workalot_job_stats');
+        const result = await this.db!.query("SELECT * FROM workalot_job_stats");
         const stats = result.rows[0] as any;
 
         return {
@@ -429,7 +465,9 @@ export class PGLiteQueue extends IQueueBackend {
           oldestPending: stats.oldest_pending ? new Date(stats.oldest_pending) : undefined,
         };
       } catch (error) {
-        throw new Error(`Failed to get queue stats: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Failed to get queue stats: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     });
   }
@@ -443,7 +481,9 @@ export class PGLiteQueue extends IQueueBackend {
         const result = await this.db!.query(`SELECT cleanup_old_jobs($1)`, [maxAgeHours]);
         return parseInt((result.rows[0] as any).cleanup_old_jobs) || 0;
       } catch (error) {
-        console.error(`Failed to cleanup old jobs: ${error instanceof Error ? error.message : String(error)}`);
+        console.error(
+          `Failed to cleanup old jobs: ${error instanceof Error ? error.message : String(error)}`,
+        );
         return 0;
       }
     });
@@ -454,13 +494,18 @@ export class PGLiteQueue extends IQueueBackend {
       this.ensureInitialized();
 
       try {
-        const result = await this.db!.query(`
+        const result = await this.db!.query(
+          `
           SELECT EXISTS(SELECT 1 FROM workalot_jobs WHERE status = $1) as has_pending
-        `, [JobStatus.PENDING]);
+        `,
+          [JobStatus.PENDING],
+        );
 
         return (result.rows[0] as any).has_pending;
       } catch (error) {
-        throw new Error(`Failed to check for pending jobs: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Failed to check for pending jobs: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     });
   }
@@ -470,13 +515,18 @@ export class PGLiteQueue extends IQueueBackend {
       this.ensureInitialized();
 
       try {
-        const result = await this.db!.query(`
+        const result = await this.db!.query(
+          `
           SELECT EXISTS(SELECT 1 FROM workalot_jobs WHERE status = $1) as has_processing
-        `, [JobStatus.PROCESSING]);
+        `,
+          [JobStatus.PROCESSING],
+        );
 
         return (result.rows[0] as any).has_processing;
       } catch (error) {
-        throw new Error(`Failed to check for processing jobs: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Failed to check for processing jobs: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     });
   }
@@ -486,10 +536,14 @@ export class PGLiteQueue extends IQueueBackend {
       this.ensureInitialized();
 
       try {
-        const result = await this.db!.query(`SELECT EXISTS(SELECT 1 FROM workalot_jobs) as has_jobs`);
+        const result = await this.db!.query(
+          `SELECT EXISTS(SELECT 1 FROM workalot_jobs) as has_jobs`,
+        );
         return !(result.rows[0] as any).has_jobs;
       } catch (error) {
-        throw new Error(`Failed to check if queue is empty: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Failed to check if queue is empty: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     });
   }
@@ -516,7 +570,9 @@ export class PGLiteQueue extends IQueueBackend {
 
         return recoveredCount;
       } catch (error) {
-        throw new Error(`Failed to recover stalled jobs: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Failed to recover stalled jobs: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     });
   }
@@ -536,18 +592,25 @@ export class PGLiteQueue extends IQueueBackend {
 
         return (result as any).rows.map((row: any) => ({
           id: row.id,
-          jobPayload: typeof row.job_payload === 'string' ? JSON.parse(row.job_payload) : row.job_payload,
+          jobPayload:
+            typeof row.job_payload === "string" ? JSON.parse(row.job_payload) : row.job_payload,
           status: row.status as JobStatus,
           requestedAt: new Date(row.requested_at),
           startedAt: row.started_at ? new Date(row.started_at) : undefined,
           completedAt: row.completed_at ? new Date(row.completed_at) : undefined,
           lastUpdated: new Date(row.last_updated),
           workerId: row.worker_id,
-          result: row.result ? (typeof row.result === 'string' ? JSON.parse(row.result) : row.result) : undefined,
+          result: row.result
+            ? typeof row.result === "string"
+              ? JSON.parse(row.result)
+              : row.result
+            : undefined,
           error: row.error_message ? new Error(row.error_message) : undefined,
         }));
       } catch (error) {
-        throw new Error(`Failed to get stalled jobs: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Failed to get stalled jobs: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     });
   }
@@ -567,9 +630,11 @@ export class PGLiteQueue extends IQueueBackend {
 
         await this.db.close();
         this.db = null;
-        console.log('PGLiteQueue shut down successfully');
+        console.log("PGLiteQueue shut down successfully");
       } catch (error) {
-        console.error(`Error during PGLiteQueue shutdown: ${error instanceof Error ? error.message : String(error)}`);
+        console.error(
+          `Error during PGLiteQueue shutdown: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
 
@@ -580,9 +645,9 @@ export class PGLiteQueue extends IQueueBackend {
     if (!this.isInitialized || !this.db) {
       // During shutdown, provide a more informative error message
       if (this.isShuttingDown) {
-        throw new Error('PGLiteQueue is shutting down. Cannot perform database operations.');
+        throw new Error("PGLiteQueue is shutting down. Cannot perform database operations.");
       }
-      throw new Error('PGLiteQueue not initialized. Call initialize() first.');
+      throw new Error("PGLiteQueue not initialized. Call initialize() first.");
     }
   }
 
@@ -592,7 +657,7 @@ export class PGLiteQueue extends IQueueBackend {
   private async executeQueued<T>(operation: () => Promise<T>): Promise<T> {
     this.ensureInitialized();
     // Trace the queue wait/execution time
-    return tracer.startActiveSpan('PGLiteQueue.executeQueued', async (span) => {
+    return tracer.startActiveSpan("PGLiteQueue.executeQueued", async (span) => {
       try {
         const result = await this.dbOperationQueue.execute(operation);
         span.setStatus({ code: SpanStatusCode.OK });
@@ -615,14 +680,19 @@ export class PGLiteQueue extends IQueueBackend {
   private mapRowToQueueItem(row: any): QueueItem {
     return {
       id: row.id,
-      jobPayload: typeof row.job_payload === 'string' ? JSON.parse(row.job_payload) : row.job_payload,
+      jobPayload:
+        typeof row.job_payload === "string" ? JSON.parse(row.job_payload) : row.job_payload,
       status: row.status as JobStatus,
       requestedAt: new Date(row.requested_at),
       startedAt: row.started_at ? new Date(row.started_at) : undefined,
       completedAt: row.completed_at ? new Date(row.completed_at) : undefined,
       lastUpdated: new Date(row.last_updated),
       workerId: row.worker_id,
-      result: row.result ? (typeof row.result === 'string' ? JSON.parse(row.result) : row.result) : undefined,
+      result: row.result
+        ? typeof row.result === "string"
+          ? JSON.parse(row.result)
+          : row.result
+        : undefined,
       error: row.error_message ? new Error(row.error_message) : undefined,
     };
   }
@@ -654,7 +724,7 @@ export class PGLiteQueue extends IQueueBackend {
       }
 
       // Load and run migration files
-      const migrationFiles = ['001_initial_schema.sql']; // Add more as needed
+      const migrationFiles = ["001_initial_schema.sql"]; // Add more as needed
 
       for (const filename of migrationFiles) {
         const versionMatch = filename.match(/^(\d+)_/);
@@ -667,44 +737,50 @@ export class PGLiteQueue extends IQueueBackend {
 
         try {
           const migrationPath = join(this.config.migrationsPath, filename);
-          const migrationSql = await readFile(migrationPath, 'utf-8');
+          const migrationSql = await readFile(migrationPath, "utf-8");
           await this.db!.exec(migrationSql);
           console.log(`Migration ${filename} completed successfully`);
         } catch (error) {
-          throw new Error(`Migration ${filename} failed: ${error instanceof Error ? error.message : String(error)}`);
+          throw new Error(
+            `Migration ${filename} failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
         }
       }
     } catch (error) {
-      throw new Error(`Failed to run migrations: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to run migrations: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
   private async setupNotificationsInternal(): Promise<void> {
     try {
       // Listen for job status changes
-      await this.db!.listen('job_status_changed', (payload: string) => {
+      await this.db!.listen("job_status_changed", (payload: string) => {
         try {
           const data = JSON.parse(payload);
-          this.emit('job-status-changed', data);
+          this.emit("job-status-changed", data);
         } catch (error) {
-          console.error('Failed to parse job status change notification:', error);
+          console.error("Failed to parse job status change notification:", error);
         }
       });
 
       // Listen for new jobs
-      await this.db!.listen('job_added', (payload: string) => {
+      await this.db!.listen("job_added", (payload: string) => {
         try {
           const data = JSON.parse(payload);
-          this.emit('item-added', data);
-          this.emit('queue-not-empty');
+          this.emit("item-added", data);
+          this.emit("queue-not-empty");
         } catch (error) {
-          console.error('Failed to parse job added notification:', error);
+          console.error("Failed to parse job added notification:", error);
         }
       });
 
-      console.log('Database notifications set up successfully');
+      console.log("Database notifications set up successfully");
     } catch (error) {
-      console.warn(`Failed to set up database notifications: ${error instanceof Error ? error.message : String(error)}`);
+      console.warn(
+        `Failed to set up database notifications: ${error instanceof Error ? error.message : String(error)}`,
+      );
       // Don't throw here as notifications are not critical for basic functionality
     }
   }
@@ -745,7 +821,8 @@ export class PGLiteQueue extends IQueueBackend {
       this.ensureInitialized();
 
       try {
-        const result = await this.db!.query(`
+        const result = await this.db!.query(
+          `
           SELECT
             id, job_payload, status, requested_at, started_at, completed_at,
             last_updated, worker_id, result, error_message, error_stack,
@@ -753,7 +830,9 @@ export class PGLiteQueue extends IQueueBackend {
             created_by, tags
           FROM workalot_jobs
           WHERE id = $1
-        `, [id]);
+        `,
+          [id],
+        );
 
         if (result.rows.length === 0) {
           return null;
@@ -771,7 +850,9 @@ export class PGLiteQueue extends IQueueBackend {
           tags: row.tags,
         };
       } catch (error) {
-        throw new Error(`Failed to get job details: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Failed to get job details: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     });
   }
@@ -779,28 +860,37 @@ export class PGLiteQueue extends IQueueBackend {
   /**
    * Schedule a job for future execution
    */
-  async scheduleJob(jobPayload: JobPayload, scheduledFor: Date, customId?: string): Promise<string> {
+  async scheduleJob(
+    jobPayload: JobPayload,
+    scheduledFor: Date,
+    customId?: string,
+  ): Promise<string> {
     return this.executeQueued(async () => {
       this.ensureInitialized();
 
       if (this.isShuttingDown) {
-        throw new Error('Queue is shutting down, cannot add new jobs');
+        throw new Error("Queue is shutting down, cannot add new jobs");
       }
 
       const id = customId || this.generateJobId();
 
       try {
-        await this.db!.query(`
+        await this.db!.query(
+          `
           INSERT INTO workalot_jobs (id, job_payload, status, requested_at, scheduled_for)
           VALUES ($1, $2, $3, NOW(), $4)
-        `, [id, jobPayload, JobStatus.PENDING, scheduledFor]);
+        `,
+          [id, jobPayload, JobStatus.PENDING, scheduledFor],
+        );
 
         return id;
       } catch (error) {
-        if (error instanceof Error && error.message.includes('duplicate key')) {
+        if (error instanceof Error && error.message.includes("duplicate key")) {
           throw new Error(`Job with ID ${id} already exists in queue`);
         }
-        throw new Error(`Failed to schedule job: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Failed to schedule job: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     });
   }
@@ -813,17 +903,22 @@ export class PGLiteQueue extends IQueueBackend {
       this.ensureInitialized();
 
       try {
-        const result = await this.db!.query(`
+        const result = await this.db!.query(
+          `
           SELECT id, job_payload, status, requested_at, started_at, completed_at,
                  last_updated, worker_id, result, error_message, error_stack
           FROM workalot_jobs
           WHERE status = $1 AND scheduled_for > NOW()
           ORDER BY scheduled_for ASC
-        `, [JobStatus.PENDING]);
+        `,
+          [JobStatus.PENDING],
+        );
 
         return (result as any).rows.map((row: any) => this.mapRowToQueueItem(row));
       } catch (error) {
-        throw new Error(`Failed to get scheduled jobs: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Failed to get scheduled jobs: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     });
   }
@@ -834,7 +929,7 @@ export class PGLiteQueue extends IQueueBackend {
   private async executeWithRetry<T>(
     operation: () => Promise<T>,
     operationName: string,
-    maxRetries: number = 3
+    maxRetries: number = 3,
   ): Promise<T> {
     let lastError: Error | null = null;
 
@@ -843,7 +938,7 @@ export class PGLiteQueue extends IQueueBackend {
         // Add small delay between attempts to reduce contention
         if (attempt > 0) {
           const delay = Math.min(100 * Math.pow(2, attempt - 1), 1000); // Exponential backoff, max 1s
-          await new Promise(resolve => setTimeout(resolve, delay));
+          await new Promise((resolve) => setTimeout(resolve, delay));
         }
 
         return await operation();
@@ -853,7 +948,9 @@ export class PGLiteQueue extends IQueueBackend {
         // Check if this is a retryable error
         if (this.isRetryableError(lastError) && attempt < maxRetries) {
           if (this.config.debug) {
-            console.warn(`${operationName} failed (attempt ${attempt + 1}/${maxRetries + 1}): ${lastError.message}`);
+            console.warn(
+              `${operationName} failed (attempt ${attempt + 1}/${maxRetries + 1}): ${lastError.message}`,
+            );
           }
           continue;
         }
@@ -863,7 +960,9 @@ export class PGLiteQueue extends IQueueBackend {
       }
     }
 
-    throw new Error(`${operationName} failed after ${maxRetries + 1} attempts: ${lastError?.message || 'Unknown error'}`);
+    throw new Error(
+      `${operationName} failed after ${maxRetries + 1} attempts: ${lastError?.message || "Unknown error"}`,
+    );
   }
 
   /**
@@ -872,12 +971,12 @@ export class PGLiteQueue extends IQueueBackend {
   private isRetryableError(error: Error): boolean {
     const message = error.message.toLowerCase();
     return (
-      message.includes('out of bounds memory access') ||
-      message.includes('memory access') ||
-      message.includes('connection') ||
-      message.includes('busy') ||
-      message.includes('locked') ||
-      message.includes('timeout')
+      message.includes("out of bounds memory access") ||
+      message.includes("memory access") ||
+      message.includes("connection") ||
+      message.includes("busy") ||
+      message.includes("locked") ||
+      message.includes("timeout")
     );
   }
 
@@ -916,7 +1015,7 @@ export class PGLiteQueue extends IQueueBackend {
           await operation();
         } catch (error) {
           // Error handling is done in the queued operation
-          console.error('Queued operation failed:', error);
+          console.error("Queued operation failed:", error);
         }
       }
     }

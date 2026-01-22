@@ -5,6 +5,7 @@ This guide explains how to set up and use TimescaleDB with Workalot for optimize
 ## Overview
 
 TimescaleDB is a PostgreSQL extension that provides time-series optimizations including:
+
 - **Hypertables**: Automatic partitioning of data by time
 - **Compression**: 70-90% storage reduction for historical data
 - **Retention Policies**: Automatic cleanup of old data
@@ -50,9 +51,9 @@ const config = {
   enableTimescaleDB: true,
 
   // Hypertable configuration
-  chunkTimeInterval: "1 hour",    // New partition every hour
-  compressionInterval: "7 days",  // Compress data older than 7 days
-  retentionInterval: "90 days",   // Keep data for 90 days
+  chunkTimeInterval: "1 hour", // New partition every hour
+  compressionInterval: "7 days", // Compress data older than 7 days
+  retentionInterval: "90 days", // Keep data for 90 days
 
   maxThreads: 4,
 };
@@ -74,39 +75,45 @@ pnpm tsx examples/timescaledb-example.ts
 
 ### Hypertable Settings
 
-| Option | Description | Default | Example |
-|--------|-------------|---------|---------|
-| `chunkTimeInterval` | Time interval for creating new partitions | `"1 hour"` | `"30 minutes"`, `"1 day"` |
-| `compressionInterval` | Age threshold for data compression | `"7 days"` | `"1 day"`, `"30 days"` |
-| `retentionInterval` | Age threshold for data deletion | `"90 days"` | `"30 days"`, `"1 year"` |
+| Option                | Description                               | Default     | Example                   |
+| --------------------- | ----------------------------------------- | ----------- | ------------------------- |
+| `chunkTimeInterval`   | Time interval for creating new partitions | `"1 hour"`  | `"30 minutes"`, `"1 day"` |
+| `compressionInterval` | Age threshold for data compression        | `"7 days"`  | `"1 day"`, `"30 days"`    |
+| `retentionInterval`   | Age threshold for data deletion           | `"90 days"` | `"30 days"`, `"1 year"`   |
 
 ### Choosing Time Intervals
 
 **Chunk Time Interval:**
+
 - Smaller chunks (e.g., 1 hour): Better query performance, more partitions
 - Larger chunks (e.g., 1 day): Fewer partitions, slightly slower queries
 
 **Compression Interval:**
+
 - Compress data that's no longer actively queried
 - Typical: 7-30 days depending on access patterns
 
 **Retention Interval:**
+
 - Balance between data availability and storage costs
 - Typical: 30-365 days depending on business requirements
 
 ## Performance Benefits
 
 ### Storage Efficiency
+
 - **70-90% reduction** in storage space for historical data
 - Automatic compression of old partitions
 - Efficient handling of large time-series datasets
 
 ### Query Performance
+
 - **Time-based partitioning** enables fast queries on recent data
 - **Automatic indexing** on time columns
 - **Parallel query execution** across partitions
 
 ### Maintenance
+
 - **Automatic retention policies** prevent unbounded growth
 - **Background compression** doesn't impact query performance
 - **Partition management** handled automatically
@@ -160,16 +167,19 @@ WHERE proc_name = 'policy_retention';
 ## Production Considerations
 
 ### High Availability
+
 - Use TimescaleDB's replication features
 - Configure connection pooling
 - Monitor disk space and compression jobs
 
 ### Backup and Recovery
+
 - Include hypertable metadata in backups
 - Test restoration procedures
 - Consider continuous archiving for large datasets
 
 ### Scaling
+
 - Horizontal scaling with TimescaleDB multi-node
 - Connection pooling for high concurrency
 - Monitor query performance and adjust partitioning
@@ -177,6 +187,7 @@ WHERE proc_name = 'policy_retention';
 ## Example Use Cases
 
 ### IoT Data Processing
+
 ```typescript
 // Process sensor data with time-series optimization
 const sensorConfig = {
@@ -188,6 +199,7 @@ const sensorConfig = {
 ```
 
 ### Financial Transactions
+
 ```typescript
 // Handle high-volume transaction processing
 const financeConfig = {
@@ -199,6 +211,7 @@ const financeConfig = {
 ```
 
 ### Log Analytics
+
 ```typescript
 // Efficient log storage and querying
 const loggingConfig = {
@@ -227,9 +240,11 @@ SELECT add_retention_policy('workalot_jobs', INTERVAL '90 days');
 ## Support
 
 For TimescaleDB-specific issues:
+
 - [TimescaleDB Documentation](https://docs.timescale.com/)
 - [TimescaleDB Community](https://www.timescale.com/community)
 
 For Workalot integration issues:
+
 - Check the main Workalot documentation
 - Review PostgreSQL queue configuration

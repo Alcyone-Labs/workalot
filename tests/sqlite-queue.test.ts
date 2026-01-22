@@ -1,14 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { SQLiteQueue, SQLiteQueueConfig } from '../src/queue/SQLiteQueue.js';
-import { JobStatus, JobPayload } from '../src/types/index.js';
-import { getTempDbFile, registerCleanupHandler } from './test-utils.js';
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { SQLiteQueue, SQLiteQueueConfig } from "../src/queue/SQLiteQueue.js";
+import { JobStatus, JobPayload } from "../src/types/index.js";
+import { getTempDbFile, registerCleanupHandler } from "./test-utils.js";
 
-describe('SQLiteQueue', () => {
+describe("SQLiteQueue", () => {
   let queue: SQLiteQueue;
   let testDbFile: string;
 
   beforeEach(async () => {
-    testDbFile = getTempDbFile('sqlite');
+    testDbFile = getTempDbFile("sqlite");
     queue = new SQLiteQueue({
       databaseUrl: testDbFile,
       debug: false,
@@ -20,20 +20,20 @@ describe('SQLiteQueue', () => {
   afterEach(async () => {
     try {
       await queue.shutdown();
-    } catch { }
+    } catch {}
   });
 
-  describe('Initialization', () => {
-    it('should initialize successfully', async () => {
+  describe("Initialization", () => {
+    it("should initialize successfully", async () => {
       expect(queue).toBeDefined();
       const stats = await queue.getStats();
       expect(stats.total).toBe(0);
       expect(stats.pending).toBe(0);
     });
 
-    it('should initialize with in-memory database', async () => {
+    it("should initialize with in-memory database", async () => {
       const memQueue = new SQLiteQueue({
-        databaseUrl: 'memory://',
+        databaseUrl: "memory://",
       });
       await memQueue.initialize();
       expect(memQueue).toBeDefined();
@@ -41,16 +41,16 @@ describe('SQLiteQueue', () => {
     });
   });
 
-  describe('Basic Operations', () => {
-    it('should add jobs to the queue', async () => {
+  describe("Basic Operations", () => {
+    it("should add jobs to the queue", async () => {
       const jobPayload: JobPayload = {
-        jobFile: 'test-job.ts',
-        jobPayload: { test: 'data' },
+        jobFile: "test-job.ts",
+        jobPayload: { test: "data" },
       };
 
       const jobId = await queue.addJob(jobPayload);
       expect(jobId).toBeDefined();
-      expect(typeof jobId).toBe('string');
+      expect(typeof jobId).toBe("string");
 
       const job = await queue.getJob(jobId);
       expect(job).toBeDefined();
@@ -58,13 +58,13 @@ describe('SQLiteQueue', () => {
       expect(job?.status).toBe(JobStatus.PENDING);
     });
 
-    it('should add jobs with custom ID', async () => {
+    it("should add jobs with custom ID", async () => {
       const jobPayload: JobPayload = {
-        jobFile: 'test-job.ts',
-        jobPayload: { test: 'data' },
+        jobFile: "test-job.ts",
+        jobPayload: { test: "data" },
       };
 
-      const customId = 'custom-job-123';
+      const customId = "custom-job-123";
       const jobId = await queue.addJob(jobPayload, customId);
       expect(jobId).toBe(customId);
 
@@ -73,28 +73,35 @@ describe('SQLiteQueue', () => {
       expect(job?.id).toBe(customId);
     });
 
-    it('should reject duplicate job IDs', async () => {
+    it("should reject duplicate job IDs", async () => {
       const jobPayload: JobPayload = {
-        jobFile: 'test-job.ts',
-        jobPayload: { test: 'data' },
+        jobFile: "test-job.ts",
+        jobPayload: { test: "data" },
       };
 
-      const customId = 'duplicate-id';
+      const customId = "duplicate-id";
       await queue.addJob(jobPayload, customId);
 
-      await expect(queue.addJob(jobPayload, customId))
-        .rejects.toThrow('Job with ID duplicate-id already exists in queue');
+      await expect(queue.addJob(jobPayload, customId)).rejects.toThrow(
+        "Job with ID duplicate-id already exists in queue",
+      );
     });
 
-    it('should update job status to processing', async () => {
+    it("should update job status to processing", async () => {
       const jobPayload: JobPayload = {
-        jobFile: 'test-job.ts',
-        jobPayload: { test: 'data' },
+        jobFile: "test-job.ts",
+        jobPayload: { test: "data" },
       };
 
       const jobId = await queue.addJob(jobPayload);
 
-      const updated = await queue.updateJobStatus(jobId, JobStatus.PROCESSING, undefined, undefined, 1);
+      const updated = await queue.updateJobStatus(
+        jobId,
+        JobStatus.PROCESSING,
+        undefined,
+        undefined,
+        1,
+      );
       expect(updated).toBe(true);
 
       const job = await queue.getJob(jobId);
@@ -103,16 +110,16 @@ describe('SQLiteQueue', () => {
       expect(job?.startedAt).toBeDefined();
     });
 
-    it('should complete jobs with results', async () => {
+    it("should complete jobs with results", async () => {
       const jobPayload: JobPayload = {
-        jobFile: 'test-job.ts',
-        jobPayload: { test: 'data' },
+        jobFile: "test-job.ts",
+        jobPayload: { test: "data" },
       };
 
       const jobId = await queue.addJob(jobPayload);
 
       const result = {
-        results: { success: true, message: 'completed' },
+        results: { success: true, message: "completed" },
         executionTime: 100,
         queueTime: 50,
       };
@@ -125,33 +132,33 @@ describe('SQLiteQueue', () => {
       expect(job?.completedAt).toBeDefined();
     });
 
-    it('should fail jobs with errors', async () => {
+    it("should fail jobs with errors", async () => {
       const jobPayload: JobPayload = {
-        jobFile: 'test-job.ts',
-        jobPayload: { test: 'data' },
+        jobFile: "test-job.ts",
+        jobPayload: { test: "data" },
       };
 
       const jobId = await queue.addJob(jobPayload);
-      const error = new Error('Job failed');
+      const error = new Error("Job failed");
 
       await queue.updateJobStatus(jobId, JobStatus.FAILED, undefined, error);
 
       const job = await queue.getJob(jobId);
       expect(job?.status).toBe(JobStatus.FAILED);
-      expect(job?.error?.message).toBe('Job failed');
+      expect(job?.error?.message).toBe("Job failed");
       expect(job?.completedAt).toBeDefined();
     });
   });
 
-  describe('Job Retrieval', () => {
-    it('should get next pending job', async () => {
+  describe("Job Retrieval", () => {
+    it("should get next pending job", async () => {
       const jobPayload1: JobPayload = {
-        jobFile: 'test-job-1.ts',
-        jobPayload: { test: 'data1' },
+        jobFile: "test-job-1.ts",
+        jobPayload: { test: "data1" },
       };
       const jobPayload2: JobPayload = {
-        jobFile: 'test-job-2.ts',
-        jobPayload: { test: 'data2' },
+        jobFile: "test-job-2.ts",
+        jobPayload: { test: "data2" },
       };
 
       const jobId1 = await queue.addJob(jobPayload1);
@@ -168,15 +175,15 @@ describe('SQLiteQueue', () => {
       expect(nextJob2?.id).toBe(jobId2);
     });
 
-    it('should return undefined when no jobs available', async () => {
+    it("should return undefined when no jobs available", async () => {
       const job = await queue.getNextPendingJob();
       expect(job).toBeUndefined();
     });
 
-    it('should get jobs by status', async () => {
+    it("should get jobs by status", async () => {
       const jobPayload: JobPayload = {
-        jobFile: 'test-job.ts',
-        jobPayload: { test: 'data' },
+        jobFile: "test-job.ts",
+        jobPayload: { test: "data" },
       };
 
       const jobId1 = await queue.addJob(jobPayload);
@@ -195,11 +202,11 @@ describe('SQLiteQueue', () => {
     });
   });
 
-  describe('Queue Statistics', () => {
-    it('should track queue statistics', async () => {
+  describe("Queue Statistics", () => {
+    it("should track queue statistics", async () => {
       const jobPayload: JobPayload = {
-        jobFile: 'test-job.ts',
-        jobPayload: { test: 'data' },
+        jobFile: "test-job.ts",
+        jobPayload: { test: "data" },
       };
 
       const jobId1 = await queue.addJob(jobPayload);
@@ -218,24 +225,24 @@ describe('SQLiteQueue', () => {
       expect(stats.failed).toBe(0);
     });
 
-    it('should check if queue has pending jobs', async () => {
+    it("should check if queue has pending jobs", async () => {
       expect(await queue.hasPendingJobs()).toBe(false);
 
       const jobPayload: JobPayload = {
-        jobFile: 'test-job.ts',
-        jobPayload: { test: 'data' },
+        jobFile: "test-job.ts",
+        jobPayload: { test: "data" },
       };
 
       await queue.addJob(jobPayload);
       expect(await queue.hasPendingJobs()).toBe(true);
     });
 
-    it('should check if queue is empty', async () => {
+    it("should check if queue is empty", async () => {
       expect(await queue.isEmpty()).toBe(true);
 
       const jobPayload: JobPayload = {
-        jobFile: 'test-job.ts',
-        jobPayload: { test: 'data' },
+        jobFile: "test-job.ts",
+        jobPayload: { test: "data" },
       };
 
       await queue.addJob(jobPayload);
@@ -243,11 +250,11 @@ describe('SQLiteQueue', () => {
     });
   });
 
-  describe('Job Recovery', () => {
-    it('should detect stalled jobs method exists', async () => {
+  describe("Job Recovery", () => {
+    it("should detect stalled jobs method exists", async () => {
       const jobPayload: JobPayload = {
-        jobFile: 'test-job.ts',
-        jobPayload: { test: 'data' },
+        jobFile: "test-job.ts",
+        jobPayload: { test: "data" },
       };
 
       const jobId = await queue.addJob(jobPayload);
@@ -258,26 +265,26 @@ describe('SQLiteQueue', () => {
       expect(Array.isArray(stalledJobs)).toBe(true);
     });
 
-    it('should recover stalled jobs', async () => {
+    it("should recover stalled jobs", async () => {
       const jobPayload: JobPayload = {
-        jobFile: 'test-job.ts',
-        jobPayload: { test: 'data' },
+        jobFile: "test-job.ts",
+        jobPayload: { test: "data" },
       };
 
       const jobId = await queue.addJob(jobPayload);
       await queue.updateJobStatus(jobId, JobStatus.PROCESSING, undefined, undefined, 1);
 
       const recoveredCount = await queue.recoverStalledJobs(1);
-      expect(typeof recoveredCount).toBe('number');
+      expect(typeof recoveredCount).toBe("number");
     });
   });
 
-  describe('Batch Operations', () => {
-    it('should add multiple jobs sequentially', async () => {
+  describe("Batch Operations", () => {
+    it("should add multiple jobs sequentially", async () => {
       const jobs = [
-        { payload: { jobFile: 'job1.ts', jobPayload: { task: 1 } } },
-        { payload: { jobFile: 'job2.ts', jobPayload: { task: 2 } } },
-        { payload: { jobFile: 'job3.ts', jobPayload: { task: 3 } } },
+        { payload: { jobFile: "job1.ts", jobPayload: { task: 1 } } },
+        { payload: { jobFile: "job2.ts", jobPayload: { task: 2 } } },
+        { payload: { jobFile: "job3.ts", jobPayload: { task: 3 } } },
       ];
 
       for (const job of jobs) {
@@ -288,7 +295,7 @@ describe('SQLiteQueue', () => {
       expect(stats.pending).toBe(3);
     });
 
-    it('should get multiple pending jobs', async () => {
+    it("should get multiple pending jobs", async () => {
       const jobs = Array.from({ length: 5 }, (_, i) => ({
         payload: { jobFile: `job${i}.ts`, jobPayload: { task: i } },
       }));
@@ -305,14 +312,14 @@ describe('SQLiteQueue', () => {
     });
   });
 
-  describe('Priority Support', () => {
-    it('should handle priority ordering when supported', async () => {
+  describe("Priority Support", () => {
+    it("should handle priority ordering when supported", async () => {
       const lowPriority: JobPayload = {
-        jobFile: 'low.ts',
+        jobFile: "low.ts",
         jobPayload: { priority: 1 },
       };
       const highPriority: JobPayload = {
-        jobFile: 'high.ts',
+        jobFile: "high.ts",
         jobPayload: { priority: 10 },
       };
 
@@ -327,30 +334,30 @@ describe('SQLiteQueue', () => {
     });
   });
 
-  describe('Cleanup', () => {
-    it('should cleanup old completed jobs', async () => {
+  describe("Cleanup", () => {
+    it("should cleanup old completed jobs", async () => {
       const jobPayload: JobPayload = {
-        jobFile: 'test-job.ts',
-        jobPayload: { test: 'data' },
+        jobFile: "test-job.ts",
+        jobPayload: { test: "data" },
       };
 
       const jobId = await queue.addJob(jobPayload);
       await queue.updateJobStatus(jobId, JobStatus.COMPLETED);
 
       const removedCount = await queue.cleanup();
-      expect(typeof removedCount).toBe('number');
+      expect(typeof removedCount).toBe("number");
     });
   });
 
-  describe('IsIdle Check', () => {
-    it('should report idle when no pending jobs', async () => {
+  describe("IsIdle Check", () => {
+    it("should report idle when no pending jobs", async () => {
       expect(await queue.isIdle()).toBe(true);
     });
 
-    it('should report not idle when jobs pending', async () => {
+    it("should report not idle when jobs pending", async () => {
       const jobPayload: JobPayload = {
-        jobFile: 'test-job.ts',
-        jobPayload: { test: 'data' },
+        jobFile: "test-job.ts",
+        jobPayload: { test: "data" },
       };
 
       await queue.addJob(jobPayload);

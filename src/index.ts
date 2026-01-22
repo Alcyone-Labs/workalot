@@ -35,10 +35,7 @@ export {
 } from "./api/TaskManagerFactory.js";
 
 // Simplified components for basic use cases
-export {
-  SimpleWorker,
-  type SimpleWorkerConfig,
-} from "./workers/base/SimpleWorker.js";
+export { SimpleWorker, type SimpleWorkerConfig } from "./workers/base/SimpleWorker.js";
 
 export {
   SimpleOrchestrator,
@@ -81,9 +78,7 @@ export type {
 } from "./types/index.js";
 
 // Value exports
-export {
-  WorkerMessageType,
-} from "./types/index.js";
+export { WorkerMessageType } from "./types/index.js";
 
 // Job system exports (for creating custom jobs)
 export {
@@ -147,17 +142,10 @@ export {
   type PendingMessage,
 } from "./communication/WebSocketServer.js";
 
-export {
-  WebSocketClient,
-  type WebSocketClientConfig,
-} from "./communication/WebSocketClient.js";
+export { WebSocketClient, type WebSocketClientConfig } from "./communication/WebSocketClient.js";
 
 // Re-export common utilities
 export { ulid } from "ulidx";
 
 // Telemetry
-export {
-  initTelemetry,
-  shutdownTelemetry,
-  type TelemetryConfig,
-} from "./telemetry.js";
+export { initTelemetry, shutdownTelemetry, type TelemetryConfig } from "./telemetry.js";

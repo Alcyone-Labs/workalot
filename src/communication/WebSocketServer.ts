@@ -1,28 +1,24 @@
 import { Elysia, t } from "elysia";
 import { EventEmitter } from "node:events";
-import {
-  WorkerMessage,
-  WorkerMessageType,
-  type ChannelMessage,
-} from "../types/index.js";
+import { WorkerMessage, WorkerMessageType, type ChannelMessage } from "../types/index.js";
 
 import { ulid } from "ulidx";
-import { opentelemetry } from '@elysiajs/opentelemetry';
-import { trace, metrics, SpanStatusCode } from '@opentelemetry/api';
+import { opentelemetry } from "@elysiajs/opentelemetry";
+import { trace, metrics, SpanStatusCode } from "@opentelemetry/api";
 
-const tracer = trace.getTracer('workalot-ws');
-const meter = metrics.getMeter('workalot-ws');
+const tracer = trace.getTracer("workalot-ws");
+const meter = metrics.getMeter("workalot-ws");
 
-const connectionCounter = meter.createUpDownCounter('ws_connections', {
-  description: 'Number of active WebSocket connections',
+const connectionCounter = meter.createUpDownCounter("ws_connections", {
+  description: "Number of active WebSocket connections",
 });
 
-const messageCounter = meter.createCounter('ws_messages_received', {
-  description: 'Total number of messages received',
+const messageCounter = meter.createCounter("ws_messages_received", {
+  description: "Total number of messages received",
 });
 
-const messageSentCounter = meter.createCounter('ws_messages_sent', {
-  description: 'Total number of messages sent',
+const messageSentCounter = meter.createCounter("ws_messages_sent", {
+  description: "Total number of messages sent",
 });
 
 export interface WebSocketConnection {
@@ -56,18 +52,12 @@ export interface WebSocketServerConfig {
 
 export interface MessageRoute {
   pattern: string | RegExp | ((message: WorkerMessage) => boolean);
-  handler: (
-    connection: WebSocketConnection,
-    message: WorkerMessage
-  ) => Promise<void> | void;
+  handler: (connection: WebSocketConnection, message: WorkerMessage) => Promise<void> | void;
   priority?: number;
 }
 
 export interface ChannelRoute {
-  handler: (
-    connection: WebSocketConnection,
-    message: ChannelMessage
-  ) => Promise<void> | void;
+  handler: (connection: WebSocketConnection, message: ChannelMessage) => Promise<void> | void;
   priority?: number;
 }
 
@@ -289,11 +279,8 @@ export class WebSocketServer extends EventEmitter {
    */
   registerStructuredRoute(
     predicate: (message: WorkerMessage) => boolean,
-    handler: (
-      connection: WebSocketConnection,
-      message: WorkerMessage
-    ) => Promise<void> | void,
-    priority?: number
+    handler: (connection: WebSocketConnection, message: WorkerMessage) => Promise<void> | void,
+    priority?: number,
   ): void {
     const route: MessageRoute = {
       pattern: (message: WorkerMessage) => predicate(message),
@@ -336,7 +323,7 @@ export class WebSocketServer extends EventEmitter {
   private sendMessage(
     connection: WebSocketConnection,
     message: WorkerMessage,
-    isRetry = false
+    isRetry = false,
   ): boolean {
     try {
       // Send the message using Elysia's send method
@@ -352,7 +339,7 @@ export class WebSocketServer extends EventEmitter {
           connectionId: connection.id,
           message,
         });
-        
+
         messageSentCounter.add(1, { type: message.type });
 
         return true;
@@ -373,13 +360,13 @@ export class WebSocketServer extends EventEmitter {
    */
   private async handleMessage(
     connection: WebSocketConnection,
-    message: WorkerMessage
+    message: WorkerMessage,
   ): Promise<void> {
-    return tracer.startActiveSpan('WebSocketServer.handleMessage', async (span) => {
-      span.setAttribute('message.type', message.type);
-      span.setAttribute('connection.id', connection.id);
-      if (message.id) span.setAttribute('message.id', message.id);
-      
+    return tracer.startActiveSpan("WebSocketServer.handleMessage", async (span) => {
+      span.setAttribute("message.type", message.type);
+      span.setAttribute("connection.id", connection.id);
+      if (message.id) span.setAttribute("message.id", message.id);
+
       messageCounter.add(1, { type: message.type });
 
       try {
@@ -387,19 +374,16 @@ export class WebSocketServer extends EventEmitter {
         connection.lastPing = new Date();
 
         // Handle acknowledgments
-        if (
-          message.type === WorkerMessageType.JOB_ACK &&
-          message.payload?.originalMessageId
-        ) {
+        if (message.type === WorkerMessageType.JOB_ACK && message.payload?.originalMessageId) {
           this.handleAcknowledgment(connection, message.payload.originalMessageId);
-          span.addEvent('Ack handled');
+          span.addEvent("Ack handled");
           return;
         }
 
         // Handle pong messages
         if (message.type === WorkerMessageType.PONG) {
           connection.lastPong = new Date();
-          span.addEvent('Pong handled');
+          span.addEvent("Pong handled");
           return;
         }
 
@@ -409,7 +393,7 @@ export class WebSocketServer extends EventEmitter {
           for (const route of this.channelRoutes) {
             await route.handler(connection, channelMessage);
           }
-          span.addEvent('Channel message passed to routes');
+          span.addEvent("Channel message passed to routes");
           return;
         }
 
@@ -424,15 +408,15 @@ export class WebSocketServer extends EventEmitter {
         if (message.type === WorkerMessageType.WORKER_READY) {
           console.log("WebSocketServer: Received WORKER_READY message", message);
           await this.handleWorkerReady(connection, message);
-          span.addEvent('Worker registered');
+          span.addEvent("Worker registered");
         }
 
         // Send acknowledgment if message has an ID
         if (message.id) {
           await this.sendAcknowledgment(connection, message.id);
-          span.addEvent('Ack sent');
+          span.addEvent("Ack sent");
         }
-        
+
         span.setStatus({ code: SpanStatusCode.OK });
       } catch (error) {
         span.recordException(error as Error);
@@ -449,7 +433,7 @@ export class WebSocketServer extends EventEmitter {
    */
   private matchesRoute(
     message: WorkerMessage,
-    pattern: string | RegExp | ((message: WorkerMessage) => boolean)
+    pattern: string | RegExp | ((message: WorkerMessage) => boolean),
   ): boolean {
     if (typeof pattern === "string") {
       return message.type === pattern;
@@ -463,10 +447,7 @@ export class WebSocketServer extends EventEmitter {
   /**
    * Track a pending message for recovery
    */
-  private trackPendingMessage(
-    connection: WebSocketConnection,
-    message: WorkerMessage
-  ): void {
+  private trackPendingMessage(connection: WebSocketConnection, message: WorkerMessage): void {
     if (!message.id) return;
 
     const pending: PendingMessage = {
@@ -486,10 +467,7 @@ export class WebSocketServer extends EventEmitter {
   /**
    * Handle message acknowledgment
    */
-  private handleAcknowledgment(
-    connection: WebSocketConnection,
-    messageId: string
-  ): void {
+  private handleAcknowledgment(connection: WebSocketConnection, messageId: string): void {
     const pending = connection.pendingMessages.get(messageId);
     if (pending) {
       if (pending.ackTimeout) {
@@ -507,10 +485,7 @@ export class WebSocketServer extends EventEmitter {
   /**
    * Handle message timeout
    */
-  private handleMessageTimeout(
-    connection: WebSocketConnection,
-    messageId: string
-  ): void {
+  private handleMessageTimeout(connection: WebSocketConnection, messageId: string): void {
     const pending = connection.pendingMessages.get(messageId);
     if (!pending) return;
 
@@ -547,7 +522,7 @@ export class WebSocketServer extends EventEmitter {
    */
   private async handleWorkerReady(
     connection: WebSocketConnection,
-    message: WorkerMessage
+    message: WorkerMessage,
   ): Promise<void> {
     const workerId = message.payload?.workerId;
     if (!workerId) return;
@@ -578,7 +553,7 @@ export class WebSocketServer extends EventEmitter {
    */
   private async sendAcknowledgment(
     connection: WebSocketConnection,
-    messageId: string
+    messageId: string,
   ): Promise<void> {
     const ackMessage: WorkerMessage = {
       type: WorkerMessageType.JOB_ACK,

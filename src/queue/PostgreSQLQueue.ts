@@ -1,26 +1,11 @@
 import { EventEmitter } from "node:events";
-import {
-  QueueItem,
-  JobStatus,
-  JobPayload,
-  JobResult,
-  QueueConfig,
-} from "../types/index.js";
+import { QueueItem, JobStatus, JobPayload, JobResult, QueueConfig } from "../types/index.js";
 import { IQueueBackend, QueueStats } from "./IQueueBackend.js";
 import { ulid } from "ulidx";
 
 // Conditional import for Bun's SQL or Node.js postgres
 let SQL: any;
-let isBunEnvironment = false;
-if (typeof globalThis.Bun !== "undefined") {
-  // @ts-ignore
-  SQL = (await import("bun")).SQL;
-  isBunEnvironment = true;
-} else {
-  // For Node.js environment, use postgres package
-  const postgresModule = await import("postgres");
-  SQL = postgresModule.default;
-}
+const isBunEnvironment = typeof globalThis.Bun !== "undefined";
 
 export interface PostgreSQLQueueConfig extends QueueConfig {
   connectionString?: string;
@@ -76,13 +61,29 @@ export class PostgreSQLQueue extends IQueueBackend {
       }:${config.port || 5432}/${config.database || "workalot"}`;
 
     // Initialize SQL connection
+    // SQL initialization moved to initialize() method to avoid top-level await
     // Both Bun and postgres use similar connection patterns
-    this.sql = new SQL(this.connectionString);
   }
 
   async initialize(): Promise<void> {
     if (this.isInitialized) {
       return;
+    }
+
+    // Load SQL module if not already loaded
+    if (!SQL) {
+      if (isBunEnvironment) {
+        // @ts-ignore
+        SQL = (await import("bun")).SQL;
+      } else {
+        const postgresModule = await import("postgres");
+        SQL = postgresModule.default;
+      }
+    }
+
+    // Initialize SQL connection
+    if (!this.sql) {
+      this.sql = new SQL(this.connectionString);
     }
 
     try {
@@ -123,7 +124,7 @@ export class PostgreSQLQueue extends IQueueBackend {
         if (hypertableCheck.length > 0) {
           // Table already exists as hypertable, skip all schema creation
           console.log(
-            `TimescaleDB: Skipping schema creation for existing hypertable ${this.tableName}`
+            `TimescaleDB: Skipping schema creation for existing hypertable ${this.tableName}`,
           );
           return;
         }
@@ -131,7 +132,7 @@ export class PostgreSQLQueue extends IQueueBackend {
         // If the query fails, continue with normal schema creation
         console.log(
           `TimescaleDB: Hypertable check failed, proceeding with schema creation:`,
-          error
+          error,
         );
       }
     }
@@ -174,12 +175,9 @@ export class PostgreSQLQueue extends IQueueBackend {
           if (primaryKeyCheck.length > 0) {
             const primaryKeyColumns = primaryKeyCheck[0].columns;
             // If primary key only contains 'id', we need to recreate the table
-            if (
-              primaryKeyColumns.length === 1 &&
-              primaryKeyColumns[0] === "id"
-            ) {
+            if (primaryKeyColumns.length === 1 && primaryKeyColumns[0] === "id") {
               console.log(
-                `TimescaleDB: Recreating table ${this.tableName} with composite primary key`
+                `TimescaleDB: Recreating table ${this.tableName} with composite primary key`,
               );
 
               // Drop dependent objects first
@@ -244,31 +242,15 @@ export class PostgreSQLQueue extends IQueueBackend {
                         requested_at, started_at, completed_at, last_updated,
                         retry_count, max_retries, priority, metadata
                       ) VALUES (
-                        '${row.id}', '${JSON.stringify(row.payload)}', '${
-                      row.status
-                    }', 
+                        '${row.id}', '${JSON.stringify(row.payload)}', '${row.status}', 
                         ${row.worker_id ? row.worker_id : "NULL"}, 
-                        ${
-                          row.result
-                            ? `'${JSON.stringify(row.result)}'`
-                            : "NULL"
-                        }, 
+                        ${row.result ? `'${JSON.stringify(row.result)}'` : "NULL"}, 
                         ${row.error ? `'${row.error}'` : "NULL"},
                         '${row.requested_at.toISOString()}', 
-                        ${
-                          row.started_at
-                            ? `'${row.started_at.toISOString()}'`
-                            : "NULL"
-                        }, 
-                        ${
-                          row.completed_at
-                            ? `'${row.completed_at.toISOString()}'`
-                            : "NULL"
-                        }, 
+                        ${row.started_at ? `'${row.started_at.toISOString()}'` : "NULL"}, 
+                        ${row.completed_at ? `'${row.completed_at.toISOString()}'` : "NULL"}, 
                         '${row.last_updated.toISOString()}', 
-                        ${row.retry_count}, ${row.max_retries}, ${
-                      row.priority
-                    }, 
+                        ${row.retry_count}, ${row.max_retries}, ${row.priority}, 
                         '${JSON.stringify(row.metadata)}'
                       )
                     `);
@@ -296,7 +278,7 @@ export class PostgreSQLQueue extends IQueueBackend {
                         row.max_retries,
                         row.priority,
                         JSON.stringify(row.metadata),
-                      ]
+                      ],
                     );
                   }
                 }
@@ -348,10 +330,7 @@ export class PostgreSQLQueue extends IQueueBackend {
           }
         }
       } catch (error) {
-        console.log(
-          `TimescaleDB: Error checking/recreating table structure:`,
-          error
-        );
+        console.log(`TimescaleDB: Error checking/recreating table structure:`, error);
         // Continue with normal schema processing
       }
     } else {
@@ -411,7 +390,7 @@ export class PostgreSQLQueue extends IQueueBackend {
           SELECT * FROM timescaledb_information.hypertables
           WHERE hypertable_name = $1
         `,
-          [this.tableName]
+          [this.tableName],
         );
       }
 
@@ -447,7 +426,7 @@ export class PostgreSQLQueue extends IQueueBackend {
             SELECT create_hypertable($1, 'requested_at',
               chunk_time_interval => INTERVAL $2)
           `,
-            [this.tableName, this.chunkTimeInterval]
+            [this.tableName, this.chunkTimeInterval],
           );
 
           // Enable compression
@@ -464,7 +443,7 @@ export class PostgreSQLQueue extends IQueueBackend {
             `
             SELECT add_compression_policy($1, INTERVAL $2)
           `,
-            [this.tableName, this.compressionInterval]
+            [this.tableName, this.compressionInterval],
           );
 
           // Set up retention policy
@@ -472,7 +451,7 @@ export class PostgreSQLQueue extends IQueueBackend {
             `
             SELECT add_retention_policy($1, INTERVAL $2)
           `,
-            [this.tableName, this.retentionInterval]
+            [this.tableName, this.retentionInterval],
           );
         }
       }
@@ -480,9 +459,7 @@ export class PostgreSQLQueue extends IQueueBackend {
 
     // Skip index creation if TimescaleDB is enabled and table is already a hypertable
     if (this.enableTimescaleDB) {
-      console.log(
-        `TimescaleDB: Checking if ${this.tableName} is already a hypertable...`
-      );
+      console.log(`TimescaleDB: Checking if ${this.tableName} is already a hypertable...`);
       let hypertableCheck;
       if (isBunEnvironment) {
         hypertableCheck = await this.sql.unsafe(`
@@ -495,20 +472,18 @@ export class PostgreSQLQueue extends IQueueBackend {
           SELECT * FROM timescaledb_information.hypertables
           WHERE hypertable_name = $1
         `,
-          [this.tableName]
+          [this.tableName],
         );
       }
 
       console.log(
-        `TimescaleDB: Hypertable check result: ${
-          hypertableCheck.rows?.length || 0
-        } rows`
+        `TimescaleDB: Hypertable check result: ${hypertableCheck.rows?.length || 0} rows`,
       );
 
       if (hypertableCheck.rows?.length > 0) {
         // Table is already a hypertable with indexes, skip index creation
         console.log(
-          `TimescaleDB: Skipping index creation for existing hypertable ${this.tableName}`
+          `TimescaleDB: Skipping index creation for existing hypertable ${this.tableName}`,
         );
         return;
       }
@@ -721,9 +696,7 @@ export class PostgreSQLQueue extends IQueueBackend {
 
     await this.sql.unsafe(`
       INSERT INTO ${this.tableName} (id, payload, status, requested_at)
-      VALUES ('${id}', '${JSON.stringify(jobPayload)}', '${
-      JobStatus.PENDING
-    }', NOW())
+      VALUES ('${id}', '${JSON.stringify(jobPayload)}', '${JobStatus.PENDING}', NOW())
     `);
 
     // Notify about new job if notifications are enabled
@@ -755,7 +728,7 @@ export class PostgreSQLQueue extends IQueueBackend {
     status: JobStatus,
     result?: JobResult,
     error?: Error,
-    workerId?: number
+    workerId?: number,
   ): Promise<boolean> {
     let rowsAffected = 0;
 
@@ -777,7 +750,7 @@ export class PostgreSQLQueue extends IQueueBackend {
             WHERE id = $3 AND status = 'pending'
             RETURNING id
           `,
-            [status, workerId, id]
+            [status, workerId, id],
           );
           rowsAffected = processing.rows?.length || 0;
         }
@@ -788,8 +761,8 @@ export class PostgreSQLQueue extends IQueueBackend {
           const completed = await this.sql.unsafe(`
             UPDATE ${this.tableName}
             SET status = '${status}', result = ${
-            result ? `'${JSON.stringify(result)}'` : "null"
-          }, completed_at = NOW()
+              result ? `'${JSON.stringify(result)}'` : "null"
+            }, completed_at = NOW()
             WHERE id = '${id}'
             RETURNING id
           `);
@@ -802,7 +775,7 @@ export class PostgreSQLQueue extends IQueueBackend {
             WHERE id = $3
             RETURNING id
           `,
-            [status, result ? JSON.stringify(result) : null, id]
+            [status, result ? JSON.stringify(result) : null, id],
           );
           rowsAffected = completed.rows?.length || 0;
         }
@@ -812,9 +785,7 @@ export class PostgreSQLQueue extends IQueueBackend {
         if (isBunEnvironment) {
           const failed = await this.sql.unsafe(`
             UPDATE ${this.tableName}
-            SET status = '${status}', error = '${
-            error?.message || null
-          }', completed_at = NOW()
+            SET status = '${status}', error = '${error?.message || null}', completed_at = NOW()
             WHERE id = '${id}'
             RETURNING id
           `);
@@ -827,7 +798,7 @@ export class PostgreSQLQueue extends IQueueBackend {
             WHERE id = $3
             RETURNING id
           `,
-            [status, error?.message || null, id]
+            [status, error?.message || null, id],
           );
           rowsAffected = failed.rows?.length || 0;
         }
@@ -850,7 +821,7 @@ export class PostgreSQLQueue extends IQueueBackend {
             WHERE id = $2
             RETURNING id
           `,
-            [status, id]
+            [status, id],
           );
           rowsAffected = updated.rows?.length || 0;
         }
@@ -912,7 +883,7 @@ export class PostgreSQLQueue extends IQueueBackend {
         ORDER BY requested_at DESC
         LIMIT 1000
       `,
-        [status]
+        [status],
       );
     }
 
@@ -1057,9 +1028,7 @@ export class PostgreSQLQueue extends IQueueBackend {
     const rowCount = result.rows?.length || result.length || 0;
 
     if (rowCount > 0 && this.enableNotifications) {
-      const jobIds = result.rows
-        ? result.rows.map((r: any) => r.id)
-        : result.map((r: any) => r.id);
+      const jobIds = result.rows ? result.rows.map((r: any) => r.id) : result.map((r: any) => r.id);
       this.eventEmitter.emit("jobs-recovered", {
         count: rowCount,
         jobIds,
@@ -1069,9 +1038,7 @@ export class PostgreSQLQueue extends IQueueBackend {
     return rowCount;
   }
 
-  async getStalledJobs(
-    stalledTimeoutMs: number = 300000
-  ): Promise<QueueItem[]> {
+  async getStalledJobs(stalledTimeoutMs: number = 300000): Promise<QueueItem[]> {
     let result;
     if (isBunEnvironment) {
       result = await this.sql.unsafe(`
@@ -1169,9 +1136,7 @@ export class PostgreSQLQueue extends IQueueBackend {
   /**
    * Batch add jobs for better performance
    */
-  async batchAddJobs(
-    jobs: Array<{ payload: JobPayload; customId?: string }>
-  ): Promise<string[]> {
+  async batchAddJobs(jobs: Array<{ payload: JobPayload; customId?: string }>): Promise<string[]> {
     const ids: string[] = [];
 
     for (const job of jobs) {
@@ -1181,9 +1146,7 @@ export class PostgreSQLQueue extends IQueueBackend {
       if (isBunEnvironment) {
         await this.sql`
           INSERT INTO ${this.tableName} (id, payload, status, requested_at)
-          VALUES (${id}, ${JSON.stringify(job.payload)}, ${
-          JobStatus.PENDING
-        }, NOW())
+          VALUES (${id}, ${JSON.stringify(job.payload)}, ${JobStatus.PENDING}, NOW())
         `;
       } else {
         await this.sql.query(
@@ -1191,7 +1154,7 @@ export class PostgreSQLQueue extends IQueueBackend {
           INSERT INTO ${this.tableName} (id, payload, status, requested_at)
           VALUES ($1, $2, $3, NOW())
         `,
-          [id, JSON.stringify(job.payload), JobStatus.PENDING]
+          [id, JSON.stringify(job.payload), JobStatus.PENDING],
         );
       }
     }
@@ -1225,7 +1188,7 @@ export class PostgreSQLQueue extends IQueueBackend {
         ORDER BY last_updated DESC
         LIMIT 100
       `,
-        [workerId]
+        [workerId],
       );
     }
 
@@ -1253,7 +1216,7 @@ export class PostgreSQLQueue extends IQueueBackend {
         WHERE id = $2 AND status = 'pending'
         RETURNING id
       `,
-        [priority, jobId]
+        [priority, jobId],
       );
     }
 
@@ -1277,8 +1240,7 @@ export class PostgreSQLQueue extends IQueueBackend {
   private mapRowToQueueItem(row: any): QueueItem {
     return {
       id: row.id,
-      jobPayload:
-        typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload,
+      jobPayload: typeof row.payload === "string" ? JSON.parse(row.payload) : row.payload,
       status: row.status as JobStatus,
       lastUpdated: new Date(row.last_updated),
       requestedAt: new Date(row.requested_at),

@@ -1,7 +1,7 @@
 /**
  * Manual test for Redis queue
  * Run with: bun run tests/redis-manual-test.ts
- * 
+ *
  * Prerequisites:
  * - Redis running locally or via Docker
  * - Run: docker run -d -p 6379:6379 redis:alpine
@@ -35,9 +35,9 @@ async function testRedisQueue() {
 
     // Add a job
     console.log("2. Adding a job...");
-    const jobId = await queue.addJob({ 
+    const jobId = await queue.addJob({
       jobFile: "test.js",
-      jobPayload: { task: "test", data: "hello world" }
+      jobPayload: { task: "test", data: "hello world" },
     });
     console.log(`✓ Job added with ID: ${jobId}\n`);
 
@@ -69,15 +69,11 @@ async function testRedisQueue() {
 
     // Update job status to completed
     console.log("7. Updating job status to completed...");
-    await queue.updateJobStatus(
-      jobId,
-      JobStatus.COMPLETED,
-      { 
-        results: { success: true, message: "Test completed" },
-        executionTime: 100,
-        queueTime: 50
-      }
-    );
+    await queue.updateJobStatus(jobId, JobStatus.COMPLETED, {
+      results: { success: true, message: "Test completed" },
+      executionTime: 100,
+      queueTime: 50,
+    });
     console.log("✓ Job status updated\n");
 
     // Verify stats after completion
@@ -161,7 +157,6 @@ async function testRedisQueue() {
     console.log(`✓ Cleaned up ${cleanedCount} old jobs\n`);
 
     console.log("✅ All tests passed!");
-
   } catch (error) {
     console.error("❌ Test failed:", error);
     throw error;
@@ -179,4 +174,3 @@ testRedisQueue().catch((error) => {
   console.error("Fatal error:", error);
   process.exit(1);
 });
-

@@ -29,7 +29,8 @@ export class ChannelRoutingExample {
 
     // Register a structured route for custom message filtering
     this.server.registerStructuredRoute(
-      (message) => message.type === WorkerMessageType.JOB_RESULT && message.payload?.success === false,
+      (message) =>
+        message.type === WorkerMessageType.JOB_RESULT && message.payload?.success === false,
       async (connection, message) => {
         console.log("Handling failed job result:", message.payload);
         // Custom logic for failed jobs

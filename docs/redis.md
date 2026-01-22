@@ -24,11 +24,11 @@ pnpm add ioredis
 ### Local Redis
 
 ```typescript
-import { RedisQueue } from '@alcyone-labs/workalot';
+import { RedisQueue } from "@alcyone-labs/workalot";
 
 const queue = new RedisQueue({
-  redisUrl: 'redis://localhost:6379',
-  keyPrefix: 'workalot',
+  redisUrl: "redis://localhost:6379",
+  keyPrefix: "workalot",
   debug: true,
 });
 
@@ -38,16 +38,16 @@ await queue.initialize();
 ### Upstash (Cloudflare-compatible)
 
 ```typescript
-import { RedisQueue } from '@alcyone-labs/workalot';
+import { RedisQueue } from "@alcyone-labs/workalot";
 
 const queue = new RedisQueue({
   redisUrl: process.env.UPSTASH_REDIS_URL,
   redisOptions: {
     tls: {
-      rejectUnauthorized: false
-    }
+      rejectUnauthorized: false,
+    },
   },
-  keyPrefix: 'workalot',
+  keyPrefix: "workalot",
 });
 
 await queue.initialize();
@@ -58,15 +58,15 @@ await queue.initialize();
 ```typescript
 interface RedisQueueConfig {
   // Connection
-  redisUrl?: string;              // Redis connection URL
-  redisOptions?: RedisOptions;    // ioredis options
-  
+  redisUrl?: string; // Redis connection URL
+  redisOptions?: RedisOptions; // ioredis options
+
   // Queue settings
-  keyPrefix?: string;             // Default: 'workalot'
-  completedJobTTL?: number;       // Default: 86400 (24 hours)
-  failedJobTTL?: number;          // Default: 604800 (7 days)
-  enablePubSub?: boolean;         // Default: false
-  debug?: boolean;                // Default: false
+  keyPrefix?: string; // Default: 'workalot'
+  completedJobTTL?: number; // Default: 86400 (24 hours)
+  failedJobTTL?: number; // Default: 604800 (7 days)
+  enablePubSub?: boolean; // Default: false
+  debug?: boolean; // Default: false
 }
 ```
 
@@ -136,13 +136,13 @@ return jobId
 
 ## Performance
 
-| Operation | Complexity | Expected Performance |
-|-----------|-----------|---------------------|
-| addJob | O(log N) | 10,000-50,000 ops/sec |
-| getNextPendingJob | O(log N) | 10,000-50,000 ops/sec |
-| getJob | O(1) | 50,000-100,000 ops/sec |
-| updateJobStatus | O(log N) | 10,000-50,000 ops/sec |
-| getStats | O(1) | 50,000-100,000 ops/sec |
+| Operation         | Complexity | Expected Performance   |
+| ----------------- | ---------- | ---------------------- |
+| addJob            | O(log N)   | 10,000-50,000 ops/sec  |
+| getNextPendingJob | O(log N)   | 10,000-50,000 ops/sec  |
+| getJob            | O(1)       | 50,000-100,000 ops/sec |
+| updateJobStatus   | O(log N)   | 10,000-50,000 ops/sec  |
+| getStats          | O(1)       | 50,000-100,000 ops/sec |
 
 **Expected throughput**: 10,000-50,000 jobs/second on a single Redis instance.
 
@@ -151,29 +151,29 @@ return jobId
 ### Basic Usage
 
 ```typescript
-import { RedisQueue } from '@alcyone-labs/workalot';
+import { RedisQueue } from "@alcyone-labs/workalot";
 
 const queue = new RedisQueue({
-  redisUrl: 'redis://localhost:6379',
+  redisUrl: "redis://localhost:6379",
 });
 
 await queue.initialize();
 
 // Add a job
 const jobId = await queue.addJob({
-  jobFile: './jobs/process-data.js',
-  jobPayload: { data: 'hello' }
+  jobFile: "./jobs/process-data.js",
+  jobPayload: { data: "hello" },
 });
 
 // Get next pending job (atomic)
 const job = await queue.getNextPendingJob();
 
 // Update job status
-await queue.updateJobStatus(
-  job.id,
-  JobStatus.COMPLETED,
-  { results: { success: true }, executionTime: 100, queueTime: 50 }
-);
+await queue.updateJobStatus(job.id, JobStatus.COMPLETED, {
+  results: { success: true },
+  executionTime: 100,
+  queueTime: 50,
+});
 
 // Get stats
 const stats = await queue.getStats();
@@ -188,9 +188,9 @@ await queue.shutdown();
 ```typescript
 // Batch add jobs
 const jobIds = await queue.batchAddJobs([
-  { payload: { jobFile: 'job1.js', jobPayload: { task: 1 } } },
-  { payload: { jobFile: 'job2.js', jobPayload: { task: 2 } } },
-  { payload: { jobFile: 'job3.js', jobPayload: { task: 3 } } },
+  { payload: { jobFile: "job1.js", jobPayload: { task: 1 } } },
+  { payload: { jobFile: "job2.js", jobPayload: { task: 2 } } },
+  { payload: { jobFile: "job3.js", jobPayload: { task: 3 } } },
 ]);
 
 console.log(`Added ${jobIds.length} jobs`);
@@ -212,14 +212,14 @@ console.log(`Recovered ${recoveredCount} jobs`);
 
 ```typescript
 const queue = new RedisQueue({
-  redisUrl: 'redis://localhost:6379',
+  redisUrl: "redis://localhost:6379",
   enablePubSub: true,
 });
 
 await queue.initialize();
 
-queue.on('notification', (message) => {
-  console.log('Notification:', message);
+queue.on("notification", (message) => {
+  console.log("Notification:", message);
   // { type: 'job-added', jobId: '...' }
   // { type: 'job-updated', jobId: '...', status: 'completed' }
 });
@@ -243,12 +243,12 @@ docker run -d -p 6379:6379 redis:alpine
 ### Cloudflare Workers + Upstash
 
 ```typescript
-import { RedisQueue } from '@alcyone-labs/workalot';
+import { RedisQueue } from "@alcyone-labs/workalot";
 
 const queue = new RedisQueue({
   redisUrl: env.UPSTASH_REDIS_URL,
   redisOptions: {
-    tls: { rejectUnauthorized: false }
+    tls: { rejectUnauthorized: false },
   },
 });
 ```
@@ -268,14 +268,14 @@ docker stop $(docker ps -q --filter ancestor=redis:alpine)
 
 ## Comparison with Other Backends
 
-| Feature | Redis | PostgreSQL | SQLite | PGLite |
-|---------|-------|-----------|--------|--------|
-| Performance | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐ |
-| Atomic ops | ✅ Lua | ✅ FOR UPDATE | ⚠️ Transactions | ⚠️ Transactions |
-| Clustering | ✅ Native | ✅ Complex | ❌ No | ❌ No |
-| Persistence | ✅ RDB/AOF | ✅ ACID | ✅ ACID | ✅ ACID |
-| Edge deploy | ✅ Upstash | ❌ No | ✅ Yes | ✅ Yes |
-| Memory usage | High | Medium | Low | Low |
+| Feature      | Redis      | PostgreSQL    | SQLite          | PGLite          |
+| ------------ | ---------- | ------------- | --------------- | --------------- |
+| Performance  | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐      | ⭐⭐⭐          | ⭐⭐⭐          |
+| Atomic ops   | ✅ Lua     | ✅ FOR UPDATE | ⚠️ Transactions | ⚠️ Transactions |
+| Clustering   | ✅ Native  | ✅ Complex    | ❌ No           | ❌ No           |
+| Persistence  | ✅ RDB/AOF | ✅ ACID       | ✅ ACID         | ✅ ACID         |
+| Edge deploy  | ✅ Upstash | ❌ No         | ✅ Yes          | ✅ Yes          |
+| Memory usage | High       | Medium        | Low             | Low             |
 
 ## Best Practices
 
@@ -289,18 +289,20 @@ docker stop $(docker ps -q --filter ancestor=redis:alpine)
 ## Troubleshooting
 
 ### Connection refused
+
 - Ensure Redis is running
 - Check connection URL
 - Verify firewall rules
 
 ### High memory usage
+
 - Reduce TTLs for completed/failed jobs
 - Run cleanup more frequently
 - Consider Redis Cluster
 
 ### Slow performance
+
 - Check Redis memory usage
 - Monitor network latency
 - Consider connection pooling
 - Use pipelining for batch operations
-

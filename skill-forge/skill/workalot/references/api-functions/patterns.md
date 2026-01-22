@@ -88,7 +88,7 @@ Retry failed jobs with exponential backoff:
 async function executeWithRetry(
   manager: TaskManager,
   jobRequest: JobRequest,
-  maxRetries: number = 3
+  maxRetries: number = 3,
 ): Promise<JobResult> {
   let lastResult: JobResult | undefined;
 
@@ -103,7 +103,7 @@ async function executeWithRetry(
 
     if (attempt < maxRetries) {
       // Exponential backoff
-      await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt - 1)));
+      await new Promise((resolve) => setTimeout(resolve, 1000 * Math.pow(2, attempt - 1)));
     }
   }
 
@@ -118,14 +118,9 @@ Schedule multiple jobs efficiently:
 ```typescript
 import { scheduleWith } from "#/index.js";
 
-async function scheduleBatch(
-  manager: TaskManager,
-  jobs: JobRequest[]
-): Promise<string[]> {
+async function scheduleBatch(manager: TaskManager, jobs: JobRequest[]): Promise<string[]> {
   // Fire and forget for maximum throughput
-  const jobIds = await Promise.all(
-    jobs.map(job => scheduleWith(manager, job))
-  );
+  const jobIds = await Promise.all(jobs.map((job) => scheduleWith(manager, job)));
 
   return jobIds;
 }

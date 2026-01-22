@@ -19,6 +19,7 @@ export default class MyJob extends BaseJob implements IJob {
 Validate payload before processing.
 
 **Parameters**:
+
 - `payload`: Job payload object
 - `options`: Validation configuration
   - `required?: string[]` - Required field names
@@ -27,6 +28,7 @@ Validate payload before processing.
 **Throws**: Error if validation fails
 
 **Example**:
+
 ```typescript
 this.validatePayload(payload, {
   required: ["userId", "action"],
@@ -43,12 +45,14 @@ this.validatePayload(payload, {
 Return successful job result.
 
 **Parameters**:
+
 - `result`: Job result data
 - `metadata`: Optional additional metadata
 
 **Returns**: Formatted success result object
 
 **Example**:
+
 ```typescript
 return this.success({
   processed: true,
@@ -61,20 +65,19 @@ return this.success({
 Return failed job result with error details.
 
 **Parameters**:
+
 - `message`: Error message
 - `metadata`: Optional additional error context
 
 **Returns**: Formatted error result object
 
 **Example**:
+
 ```typescript
-return this.error(
-  "Processing failed",
-  {
-    payload,
-    stack: error instanceof Error ? error.stack : undefined,
-  }
-);
+return this.error("Processing failed", {
+  payload,
+  stack: error instanceof Error ? error.stack : undefined,
+});
 ```
 
 ### `getJobId(payload: any): string`
@@ -82,11 +85,13 @@ return this.error(
 Override to provide custom job ID generation.
 
 **Parameters**:
+
 - `payload`: Job payload
 
 **Returns**: Custom job ID string
 
 **Example**:
+
 ```typescript
 getJobId(payload: { userId: number; action: string }): string {
   return `user-${payload.userId}-${payload.action}-${Date.now()}`;
@@ -162,7 +167,9 @@ export default class MyJob extends BaseJob implements IJob {
 
     // Check if part of workflow
     if (context?.metaEnvelope) {
-      console.log(`Step ${context.metaEnvelope.stepNumber} of workflow ${context.metaEnvelope.workflowId}`);
+      console.log(
+        `Step ${context.metaEnvelope.stepNumber} of workflow ${context.metaEnvelope.workflowId}`,
+      );
     }
 
     try {
@@ -187,14 +194,11 @@ export default class MyJob extends BaseJob implements IJob {
       });
     } catch (error) {
       // Return error with context
-      return this.error(
-        error instanceof Error ? error.message : "Unknown error",
-        {
-          payload,
-          stack: error instanceof Error ? error.stack : undefined,
-          workflowContext: context?.metaEnvelope,
-        }
-      );
+      return this.error(error instanceof Error ? error.message : "Unknown error", {
+        payload,
+        stack: error instanceof Error ? error.stack : undefined,
+        workflowContext: context?.metaEnvelope,
+      });
     }
   }
 
@@ -233,6 +237,8 @@ JobRegistry.register("my-job", MyJob);
 // Schedule with registered job name
 await scheduleAndWait({
   jobFile: "my-job", // Uses registered class
-  jobPayload: { /* ... */ },
+  jobPayload: {
+    /* ... */
+  },
 });
 ```

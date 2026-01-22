@@ -1,6 +1,6 @@
-import { EventEmitter } from 'node:events';
-import { IQueueBackend } from '../queue/IQueueBackend.js';
-import { QueueItem, JobStatus } from '../types/index.js';
+import { EventEmitter } from "node:events";
+import { IQueueBackend } from "../queue/IQueueBackend.js";
+import { QueueItem, JobStatus } from "../types/index.js";
 
 export interface JobRecoveryConfig {
   /**
@@ -42,7 +42,7 @@ export class JobRecoveryService extends EventEmitter {
 
   constructor(queueBackend: IQueueBackend, config: Partial<JobRecoveryConfig> = {}) {
     super();
-    
+
     this.queueBackend = queueBackend;
     this.config = {
       checkInterval: config.checkInterval || 60000, // 1 minute
@@ -65,22 +65,24 @@ export class JobRecoveryService extends EventEmitter {
 
     // Start periodic checks
     this.checkInterval = setInterval(() => {
-      this.checkAndRecoverStalledJobs().catch(error => {
-        console.error('Error during stalled job recovery:', error);
-        this.emit('recovery-error', error);
+      this.checkAndRecoverStalledJobs().catch((error) => {
+        console.error("Error during stalled job recovery:", error);
+        this.emit("recovery-error", error);
       });
     }, this.config.checkInterval);
 
     // Run initial check
     setTimeout(() => {
-      this.checkAndRecoverStalledJobs().catch(error => {
-        console.error('Error during initial stalled job recovery:', error);
-        this.emit('recovery-error', error);
+      this.checkAndRecoverStalledJobs().catch((error) => {
+        console.error("Error during initial stalled job recovery:", error);
+        this.emit("recovery-error", error);
       });
     }, 1000); // Wait 1 second after start
 
-    console.log(`Job recovery service started - checking every ${this.config.checkInterval}ms for jobs stalled longer than ${this.config.stalledTimeout}ms`);
-    this.emit('started');
+    console.log(
+      `Job recovery service started - checking every ${this.config.checkInterval}ms for jobs stalled longer than ${this.config.stalledTimeout}ms`,
+    );
+    this.emit("started");
   }
 
   /**
@@ -99,8 +101,8 @@ export class JobRecoveryService extends EventEmitter {
       this.checkInterval = undefined;
     }
 
-    console.log('Job recovery service stopped');
-    this.emit('stopped');
+    console.log("Job recovery service stopped");
+    this.emit("stopped");
   }
 
   /**
@@ -114,13 +116,13 @@ export class JobRecoveryService extends EventEmitter {
     try {
       // Get stalled jobs
       const stalledJobs = await this.queueBackend.getStalledJobs(this.config.stalledTimeout);
-      
+
       if (stalledJobs.length === 0) {
         return;
       }
 
       console.log(`Found ${stalledJobs.length} stalled jobs`);
-      this.emit('stalled-jobs-found', stalledJobs);
+      this.emit("stalled-jobs-found", stalledJobs);
 
       // Process each stalled job
       const recoveredJobs: QueueItem[] = [];
@@ -128,7 +130,7 @@ export class JobRecoveryService extends EventEmitter {
 
       for (const job of stalledJobs) {
         const attempts = this.recoveryAttempts.get(job.id) || 0;
-        
+
         if (attempts >= this.config.maxRecoveryAttempts) {
           // Mark job as failed - too many recovery attempts
           try {
@@ -136,12 +138,14 @@ export class JobRecoveryService extends EventEmitter {
               job.id,
               JobStatus.FAILED,
               undefined,
-              new Error(`Job failed after ${attempts} recovery attempts - exceeded maximum retries`)
+              new Error(
+                `Job failed after ${attempts} recovery attempts - exceeded maximum retries`,
+              ),
             );
-            
+
             failedJobs.push(job);
             this.recoveryAttempts.delete(job.id);
-            
+
             console.log(`Job ${job.id} marked as failed after ${attempts} recovery attempts`);
           } catch (error) {
             console.error(`Failed to mark job ${job.id} as failed:`, error);
@@ -155,10 +159,12 @@ export class JobRecoveryService extends EventEmitter {
 
       // Recover jobs that haven't exceeded max attempts
       if (recoveredJobs.length > 0) {
-        const actualRecovered = await this.queueBackend.recoverStalledJobs(this.config.stalledTimeout);
-        
+        const actualRecovered = await this.queueBackend.recoverStalledJobs(
+          this.config.stalledTimeout,
+        );
+
         console.log(`Recovered ${actualRecovered} stalled jobs`);
-        this.emit('jobs-recovered', {
+        this.emit("jobs-recovered", {
           count: actualRecovered,
           jobs: recoveredJobs,
         });
@@ -166,15 +172,14 @@ export class JobRecoveryService extends EventEmitter {
 
       // Emit failed jobs event
       if (failedJobs.length > 0) {
-        this.emit('jobs-failed', {
+        this.emit("jobs-failed", {
           count: failedJobs.length,
           jobs: failedJobs,
         });
       }
-
     } catch (error) {
-      console.error('Error checking for stalled jobs:', error);
-      this.emit('recovery-error', error);
+      console.error("Error checking for stalled jobs:", error);
+      this.emit("recovery-error", error);
     }
   }
 
@@ -183,7 +188,7 @@ export class JobRecoveryService extends EventEmitter {
    */
   async triggerCheck(): Promise<void> {
     if (!this.config.enabled) {
-      throw new Error('Job recovery service is disabled');
+      throw new Error("Job recovery service is disabled");
     }
 
     await this.checkAndRecoverStalledJobs();

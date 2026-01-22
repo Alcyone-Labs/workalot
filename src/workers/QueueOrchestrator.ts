@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
-import { 
-  BatchJobContext, 
-  WorkerQueueStatus, 
+import {
+  BatchJobContext,
+  WorkerQueueStatus,
   WorkerQueueConfig,
   JobResult,
   WorkerMessage,
@@ -9,7 +9,7 @@ import {
   FillQueuePayload,
   RequestJobsPayload,
   JobAckPayload,
-  QueueResultPayload
+  QueueResultPayload,
 } from "../types/index.js";
 
 export interface WorkerQueueState {
@@ -86,7 +86,7 @@ export class QueueOrchestrator extends EventEmitter {
     }
 
     this.isRunning = true;
-    
+
     // Start periodic distribution check (every 1ms for maximum responsiveness)
     this.distributionInterval = setInterval(() => {
       this.checkAndDistributeJobs();
@@ -104,7 +104,7 @@ export class QueueOrchestrator extends EventEmitter {
     }
 
     this.isRunning = false;
-    
+
     if (this.distributionInterval) {
       clearInterval(this.distributionInterval);
       this.distributionInterval = undefined;
@@ -117,9 +117,9 @@ export class QueueOrchestrator extends EventEmitter {
    * Distribute jobs to workers that need them
    */
   async distributeJobsToWorker(
-    workerId: number, 
-    jobs: BatchJobContext[], 
-    sendMessage: (workerId: number, message: WorkerMessage) => void
+    workerId: number,
+    jobs: BatchJobContext[],
+    sendMessage: (workerId: number, message: WorkerMessage) => void,
   ): Promise<void> {
     const workerState = this.workerQueues.get(workerId);
     if (!workerState) {
@@ -155,10 +155,7 @@ export class QueueOrchestrator extends EventEmitter {
   /**
    * Handle job request from worker
    */
-  handleJobRequest(
-    workerId: number,
-    requestPayload: RequestJobsPayload
-  ): void {
+  handleJobRequest(workerId: number, requestPayload: RequestJobsPayload): void {
     const workerState = this.workerQueues.get(workerId);
     if (!workerState) {
       console.warn(`Job request from unregistered worker ${workerId}`);
@@ -179,10 +176,7 @@ export class QueueOrchestrator extends EventEmitter {
   /**
    * Handle job result from worker
    */
-  handleJobResult(
-    workerId: number,
-    resultPayload: QueueResultPayload
-  ): void {
+  handleJobResult(workerId: number, resultPayload: QueueResultPayload): void {
     const workerState = this.workerQueues.get(workerId);
     if (!workerState) {
       console.warn(`Job result from unregistered worker ${workerId}`);
@@ -211,7 +205,7 @@ export class QueueOrchestrator extends EventEmitter {
   acknowledgeJob(
     workerId: number,
     jobId: string,
-    sendMessage: (workerId: number, message: WorkerMessage) => void
+    sendMessage: (workerId: number, message: WorkerMessage) => void,
   ): void {
     const workerState = this.workerQueues.get(workerId);
     if (!workerState) {
@@ -249,11 +243,12 @@ export class QueueOrchestrator extends EventEmitter {
     }
 
     workerState.status = { ...workerState.status, ...status };
-    
+
     // Calculate queue utilization
     const totalCapacity = this.config.workerQueueSize;
     const currentUsage = workerState.status.pendingJobs + workerState.status.processingJobs;
-    workerState.status.queueUtilization = totalCapacity > 0 ? (currentUsage / totalCapacity) * 100 : 0;
+    workerState.status.queueUtilization =
+      totalCapacity > 0 ? (currentUsage / totalCapacity) * 100 : 0;
   }
 
   /**
@@ -261,10 +256,12 @@ export class QueueOrchestrator extends EventEmitter {
    */
   getWorkersNeedingJobs(): number[] {
     const needyWorkers: number[] = [];
-    
+
     for (const [workerId, workerState] of this.workerQueues) {
-      if (workerState.status.needsMoreJobs && 
-          workerState.status.pendingJobs < this.config.queueThreshold) {
+      if (
+        workerState.status.needsMoreJobs &&
+        workerState.status.pendingJobs < this.config.queueThreshold
+      ) {
         needyWorkers.push(workerId);
       }
     }
@@ -299,11 +296,11 @@ export class QueueOrchestrator extends EventEmitter {
       totalCompletedJobs += workerState.status.completedJobs;
       totalProcessed += workerState.status.totalProcessed;
       totalUtilization += workerState.status.queueUtilization;
-      
+
       if (workerState.status.pendingJobs > 0 || workerState.status.processingJobs > 0) {
         activeWorkers++;
       }
-      
+
       if (workerState.status.needsMoreJobs) {
         workersNeedingJobs++;
       }
@@ -329,7 +326,7 @@ export class QueueOrchestrator extends EventEmitter {
    */
   private checkAndDistributeJobs(): void {
     const workersNeedingJobs = this.getWorkersNeedingJobs();
-    
+
     if (workersNeedingJobs.length > 0) {
       this.emit("distribution-needed", {
         workerIds: workersNeedingJobs,

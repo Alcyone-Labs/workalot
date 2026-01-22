@@ -44,6 +44,7 @@ The server will start on `http://localhost:3000`
 ### 2. Open the Frontend
 
 Open `examples/full-stack/frontend/index.html` in your browser, or visit:
+
 ```
 http://localhost:3000
 ```
@@ -53,6 +54,7 @@ The server serves the frontend automatically.
 ## API Endpoints
 
 ### Submit a Job
+
 ```http
 POST /api/jobs
 Content-Type: application/json
@@ -67,16 +69,19 @@ Content-Type: application/json
 ```
 
 ### Get Job Status
+
 ```http
 GET /api/jobs/:jobId
 ```
 
 ### Get All Jobs
+
 ```http
 GET /api/jobs
 ```
 
 ### Get Queue Statistics
+
 ```http
 GET /api/stats
 ```
@@ -84,6 +89,7 @@ GET /api/stats
 ## Job Types
 
 ### 1. Image Processing Job
+
 Simulates image processing operations (resize, compress, filter)
 
 ```json
@@ -97,6 +103,7 @@ Simulates image processing operations (resize, compress, filter)
 ```
 
 ### 2. Data Analysis Job
+
 Simulates data analysis and aggregation
 
 ```json
@@ -110,6 +117,7 @@ Simulates data analysis and aggregation
 ```
 
 ### 3. Report Generation Job
+
 Simulates PDF report generation
 
 ```json
@@ -147,21 +155,21 @@ examples/full-stack/
 The backend uses Elysia.js with Workalot:
 
 ```typescript
-import { Elysia } from 'elysia';
-import { TaskManager } from '#/index.js';
+import { Elysia } from "elysia";
+import { TaskManager } from "#/index.js";
 
 const taskManager = new TaskManager({
-  backend: 'memory',
-  maxThreads: 4
+  backend: "memory",
+  maxThreads: 4,
 });
 
 await taskManager.initialize();
 
 const app = new Elysia()
-  .post('/api/jobs', async ({ body }) => {
+  .post("/api/jobs", async ({ body }) => {
     const jobId = await taskManager.schedule({
       jobFile: `examples/full-stack/jobs/${body.type}Job.ts`,
-      jobPayload: body.payload
+      jobPayload: body.payload,
     });
     return { jobId };
   })
@@ -174,10 +182,10 @@ The frontend uses vanilla JavaScript with fetch API:
 
 ```javascript
 async function submitJob(type, payload) {
-  const response = await fetch('/api/jobs', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type, payload })
+  const response = await fetch("/api/jobs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type, payload }),
   });
   return response.json();
 }
@@ -200,4 +208,3 @@ This example demonstrates common real-world scenarios:
 - Add job scheduling (cron-like)
 - Integrate with Redis for distributed processing
 - Add authentication and authorization
-

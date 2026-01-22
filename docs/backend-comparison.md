@@ -6,16 +6,16 @@ Workalot provides multiple queue backends to suit different deployment scenarios
 
 ## Backend Comparison Matrix
 
-| Feature | Memory | SQLite | PGLite | PostgreSQL |
-|---------|---------|---------|---------|------------|
-| **Persistence** | ❌ Limited | ✅ Good | ✅ Good | ✅ Excellent |
-| **Performance** | ⚡ Highest | ⚡ High | 🔄 Medium | 🔄 Variable |
-| **Scalability** | ❌ Single Process | ✅ Single Machine | ✅ Single Machine | ✅ Multi-Machine |
-| **Setup Complexity** | ✅ None | ✅ Minimal | 🔄 Moderate | ❌ High |
-| **Memory Usage** | ❌ High | ✅ Low | 🔄 Medium | ✅ Low |
-| **Concurrent Access** | ❌ Limited | ✅ Good (WAL) | ✅ Good | ✅ Excellent |
-| **Query Capabilities** | ❌ Basic | ✅ Good | ✅ Full SQL | ✅ Full SQL |
-| **Production Ready** | 🔄 Limited | ✅ Yes | 🔄 Experimental | ✅ Yes |
+| Feature                | Memory            | SQLite            | PGLite            | PostgreSQL       |
+| ---------------------- | ----------------- | ----------------- | ----------------- | ---------------- |
+| **Persistence**        | ❌ Limited        | ✅ Good           | ✅ Good           | ✅ Excellent     |
+| **Performance**        | ⚡ Highest        | ⚡ High           | 🔄 Medium         | 🔄 Variable      |
+| **Scalability**        | ❌ Single Process | ✅ Single Machine | ✅ Single Machine | ✅ Multi-Machine |
+| **Setup Complexity**   | ✅ None           | ✅ Minimal        | 🔄 Moderate       | ❌ High          |
+| **Memory Usage**       | ❌ High           | ✅ Low            | 🔄 Medium         | ✅ Low           |
+| **Concurrent Access**  | ❌ Limited        | ✅ Good (WAL)     | ✅ Good           | ✅ Excellent     |
+| **Query Capabilities** | ❌ Basic          | ✅ Good           | ✅ Full SQL       | ✅ Full SQL      |
+| **Production Ready**   | 🔄 Limited        | ✅ Yes            | 🔄 Experimental   | ✅ Yes           |
 
 ## Detailed Backend Analysis
 
@@ -24,6 +24,7 @@ Workalot provides multiple queue backends to suit different deployment scenarios
 **Purpose**: High-performance, in-process job queue for development and testing scenarios.
 
 #### Strengths
+
 - **Blazing Fast Performance**: No I/O overhead, direct memory access
 - **Zero Configuration**: Works immediately without any setup
 - **Minimal Latency**: Microsecond-level job operations
@@ -31,6 +32,7 @@ Workalot provides multiple queue backends to suit different deployment scenarios
 - **Simple Implementation**: Easy to understand and debug
 
 #### Weaknesses
+
 - **No Persistence**: All jobs lost on process restart
 - **Limited Scalability**: Cannot share jobs between processes
 - **Memory Constraints**: Limited by available RAM
@@ -38,6 +40,7 @@ Workalot provides multiple queue backends to suit different deployment scenarios
 - **No Advanced Features**: Basic FIFO operations only
 
 #### Best Use Cases
+
 - Local development and testing
 - Temporary job processing
 - High-frequency, short-lived tasks
@@ -45,16 +48,18 @@ Workalot provides multiple queue backends to suit different deployment scenarios
 - CI/CD pipeline jobs
 
 #### Configuration Example
+
 ```typescript
-import { TaskManager } from 'workalot';
+import { TaskManager } from "workalot";
 
 const manager = new TaskManager({
-  backend: 'memory',
+  backend: "memory",
   maxInMemoryAge: 60 * 60 * 1000, // 1 hour retention
 });
 ```
 
 #### Performance Characteristics
+
 - **Throughput**: 100,000+ jobs/second
 - **Latency**: < 1ms per operation
 - **Memory Usage**: ~1KB per job
@@ -66,6 +71,7 @@ const manager = new TaskManager({
 **Purpose**: Reliable, file-based queue with excellent performance and persistence for single-machine deployments.
 
 #### Strengths
+
 - **Excellent Performance**: Near-memory speeds with WAL mode
 - **Built-in Persistence**: Automatic disk persistence
 - **Zero Dependencies**: Native support in most environments
@@ -76,6 +82,7 @@ const manager = new TaskManager({
 - **Battle-tested**: Mature, stable technology
 
 #### Weaknesses
+
 - **Single Machine Only**: Cannot scale across servers
 - **Write Contention**: Single writer limitation
 - **File Locking Issues**: NFS/network filesystem problems
@@ -84,6 +91,7 @@ const manager = new TaskManager({
 - **No Built-in Replication**: Manual backup strategies needed
 
 #### Best Use Cases
+
 - Small to medium applications
 - Desktop applications
 - Edge computing scenarios
@@ -92,23 +100,25 @@ const manager = new TaskManager({
 - Applications requiring portability
 
 #### Configuration Example
+
 ```typescript
-import { TaskManager } from 'workalot';
+import { TaskManager } from "workalot";
 
 const manager = new TaskManager({
-  backend: 'sqlite',
-  databaseUrl: './data/queue.db', // or 'memory://' for in-memory
+  backend: "sqlite",
+  databaseUrl: "./data/queue.db", // or 'memory://' for in-memory
   // SQLite-specific optimizations
   sqliteConfig: {
-    walMode: true,           // Enable WAL for better concurrency
-    busyTimeout: 5000,       // Wait up to 5s for locks
-    cacheSize: 10000,        // Page cache size
-    synchronous: 'NORMAL',   // Balance between safety and speed
-  }
+    walMode: true, // Enable WAL for better concurrency
+    busyTimeout: 5000, // Wait up to 5s for locks
+    cacheSize: 10000, // Page cache size
+    synchronous: "NORMAL", // Balance between safety and speed
+  },
 });
 ```
 
 #### Performance Characteristics
+
 - **Throughput**: 10,000-50,000 jobs/second (WAL mode)
 - **Latency**: 1-5ms per operation
 - **Database Size**: Performs well up to 10GB
@@ -116,6 +126,7 @@ const manager = new TaskManager({
 - **Concurrent Writers**: 1 (serialized)
 
 #### Optimization Tips
+
 - Enable WAL mode for better concurrency
 - Use in-memory database for temporary queues
 - Regular VACUUM for long-running applications
@@ -129,6 +140,7 @@ const manager = new TaskManager({
 **Purpose**: PostgreSQL-compatible queue running in WebAssembly for advanced SQL features without server setup.
 
 #### Strengths
+
 - **PostgreSQL Compatibility**: Full PostgreSQL SQL syntax
 - **No Server Required**: Runs entirely in-process
 - **Advanced Features**: CTEs, window functions, JSON operations
@@ -138,6 +150,7 @@ const manager = new TaskManager({
 - **Extension Support**: Many PostgreSQL extensions available
 
 #### Weaknesses
+
 - **WebAssembly Overhead**: Slower than native implementations
 - **Memory Usage**: Higher memory footprint
 - **Startup Time**: Slow initialization (1-2 seconds)
@@ -147,6 +160,7 @@ const manager = new TaskManager({
 - **Platform Limitations**: WebAssembly constraints
 
 #### Best Use Cases
+
 - Development environments needing PostgreSQL compatibility
 - Applications requiring advanced SQL features
 - Offline-first applications
@@ -155,24 +169,26 @@ const manager = new TaskManager({
 - Educational purposes
 
 #### Configuration Example
+
 ```typescript
-import { TaskManager } from 'workalot';
+import { TaskManager } from "workalot";
 
 const manager = new TaskManager({
-  backend: 'pglite',
-  databaseUrl: './data/pglite', // Directory for data files
+  backend: "pglite",
+  databaseUrl: "./data/pglite", // Directory for data files
   pgliteConfig: {
-    memory: true,           // Run entirely in memory
+    memory: true, // Run entirely in memory
     relaxedDurability: true, // Trade durability for speed
     extensions: {
-      pgvector: true,       // Enable vector operations
-      postgis: false,       // Spatial data support
-    }
-  }
+      pgvector: true, // Enable vector operations
+      postgis: false, // Spatial data support
+    },
+  },
 });
 ```
 
 #### Performance Characteristics
+
 - **Throughput**: 1,000-5,000 jobs/second
 - **Latency**: 5-20ms per operation
 - **Memory Usage**: 50-200MB baseline
@@ -180,6 +196,7 @@ const manager = new TaskManager({
 - **Query Complexity**: Handles complex queries well
 
 #### Optimization Tips
+
 - Use in-memory mode for better performance
 - Enable relaxed durability for non-critical data
 - Minimize extension usage
@@ -193,6 +210,7 @@ const manager = new TaskManager({
 **Purpose**: Enterprise-grade queue backend for distributed, high-reliability production deployments.
 
 #### Strengths
+
 - **Enterprise Features**: Replication, partitioning, clustering
 - **Horizontal Scalability**: Multi-server deployments
 - **Advanced Querying**: Full SQL with extensions
@@ -205,6 +223,7 @@ const manager = new TaskManager({
 - **Proven Reliability**: Decades of production use
 
 #### Weaknesses
+
 - **Setup Complexity**: Requires database server
 - **Network Overhead**: Remote connection latency
 - **Resource Intensive**: Requires dedicated resources
@@ -214,6 +233,7 @@ const manager = new TaskManager({
 - **Overkill for Simple Use**: Too complex for basic needs
 
 #### Best Use Cases
+
 - Large-scale production systems
 - Distributed applications
 - Multi-tenant systems
@@ -223,12 +243,13 @@ const manager = new TaskManager({
 - Financial/healthcare applications
 
 #### Configuration Example
+
 ```typescript
-import { TaskManager } from 'workalot';
+import { TaskManager } from "workalot";
 
 const manager = new TaskManager({
-  backend: 'postgresql',
-  databaseUrl: 'postgresql://user:pass@localhost:5432/queue_db',
+  backend: "postgresql",
+  databaseUrl: "postgresql://user:pass@localhost:5432/queue_db",
   postgresConfig: {
     // Connection pool settings
     poolSize: 20,
@@ -240,19 +261,20 @@ const manager = new TaskManager({
     queryTimeout: 60000,
 
     // Features
-    enableListen: true,      // LISTEN/NOTIFY support
+    enableListen: true, // LISTEN/NOTIFY support
     enablePartitioning: true, // Table partitioning
 
     // SSL configuration
     ssl: {
       rejectUnauthorized: true,
-      ca: fs.readFileSync('./ca.pem'),
-    }
-  }
+      ca: fs.readFileSync("./ca.pem"),
+    },
+  },
 });
 ```
 
 #### Performance Characteristics
+
 - **Throughput**: 5,000-50,000 jobs/second (depends on hardware)
 - **Latency**: 2-10ms per operation (local network)
 - **Scalability**: Linear with hardware
@@ -260,6 +282,7 @@ const manager = new TaskManager({
 - **Database Size**: Terabytes without issue
 
 #### Optimization Tips
+
 - Use connection pooling (pgbouncer/pgpool)
 - Proper indexing strategy
 - Regular VACUUM and ANALYZE
@@ -273,6 +296,7 @@ const manager = new TaskManager({
 ## Decision Matrix
 
 ### Choose Memory Queue When:
+
 - ✅ Developing and testing
 - ✅ Performance is critical
 - ✅ Job persistence isn't required
@@ -280,6 +304,7 @@ const manager = new TaskManager({
 - ✅ Jobs are short-lived
 
 ### Choose SQLite Queue When:
+
 - ✅ Need persistence without a server
 - ✅ Deploying to edge/embedded devices
 - ✅ Single machine deployment
@@ -287,6 +312,7 @@ const manager = new TaskManager({
 - ✅ Need good performance with persistence
 
 ### Choose PGLite Queue When:
+
 - ✅ Need PostgreSQL compatibility
 - ✅ Want advanced SQL features
 - ✅ Testing PostgreSQL-specific code
@@ -294,6 +320,7 @@ const manager = new TaskManager({
 - ✅ Learning/educational purposes
 
 ### Choose PostgreSQL Queue When:
+
 - ✅ Building production systems
 - ✅ Need horizontal scalability
 - ✅ Require high availability
@@ -304,13 +331,15 @@ const manager = new TaskManager({
 ## Migration Strategies
 
 ### Memory → SQLite
+
 ```typescript
 // Minimal changes required
-const devConfig = { backend: 'memory' };
-const prodConfig = { backend: 'sqlite', databaseUrl: './queue.db' };
+const devConfig = { backend: "memory" };
+const prodConfig = { backend: "sqlite", databaseUrl: "./queue.db" };
 ```
 
 ### SQLite → PostgreSQL
+
 ```typescript
 // Export from SQLite
 const sqliteData = await sqliteQueue.getAllJobs();
@@ -322,33 +351,38 @@ for (const job of sqliteData) {
 ```
 
 ### PostgreSQL → PGLite (for testing)
+
 ```typescript
 // Use same SQL queries, just different connection
-const prodConfig = { backend: 'postgresql', databaseUrl: 'postgres://...' };
-const testConfig = { backend: 'pglite', databaseUrl: 'memory://' };
+const prodConfig = { backend: "postgresql", databaseUrl: "postgres://..." };
+const testConfig = { backend: "pglite", databaseUrl: "memory://" };
 ```
 
 ## Performance Tuning Guidelines
 
 ### Memory Queue
+
 - Implement job expiration
 - Monitor memory usage
 - Use job batching
 - Implement cleanup intervals
 
 ### SQLite Queue
+
 - Enable WAL mode
 - Optimize page cache
 - Regular VACUUM
 - Proper indexing
 
 ### PGLite Queue
+
 - Use in-memory mode when possible
 - Batch operations
 - Minimize extension usage
 - Consider native alternatives for production
 
 ### PostgreSQL Queue
+
 - Connection pooling
 - Query optimization
 - Partitioning strategy

@@ -1,5 +1,5 @@
-import { TaskManager } from './TaskManager.js';
-import { QueueConfig } from '../types/index.js';
+import { TaskManager } from "./TaskManager.js";
+import { QueueConfig } from "../types/index.js";
 
 export interface TaskManagerInstance {
   manager: TaskManager;
@@ -54,12 +54,14 @@ export class TaskManagerFactory {
    * @throws Error if instance with same name already exists
    */
   async create(
-    name: string = 'default',
+    name: string = "default",
     config: QueueConfig = {},
-    projectRoot?: string
+    projectRoot?: string,
   ): Promise<TaskManager> {
     if (this.instances.has(name)) {
-      throw new Error(`TaskManager instance '${name}' already exists. Use get() or destroy it first.`);
+      throw new Error(
+        `TaskManager instance '${name}' already exists. Use get() or destroy it first.`,
+      );
     }
 
     // Merge configurations
@@ -69,10 +71,7 @@ export class TaskManagerFactory {
     };
 
     // Create and initialize the manager
-    const manager = new TaskManager(
-      mergedConfig,
-      projectRoot || this.defaultProjectRoot
-    );
+    const manager = new TaskManager(mergedConfig, projectRoot || this.defaultProjectRoot);
 
     await manager.initialize();
 
@@ -98,9 +97,9 @@ export class TaskManagerFactory {
    * @returns TaskManager instance
    */
   async getOrCreate(
-    name: string = 'default',
+    name: string = "default",
     config: QueueConfig = {},
-    projectRoot?: string
+    projectRoot?: string,
   ): Promise<TaskManager> {
     const existing = this.get(name);
     if (existing) {
@@ -116,7 +115,7 @@ export class TaskManagerFactory {
    * @param name - Name of the instance
    * @returns TaskManager instance or undefined if not found
    */
-  get(name: string = 'default'): TaskManager | undefined {
+  get(name: string = "default"): TaskManager | undefined {
     return this.instances.get(name)?.manager;
   }
 
@@ -179,8 +178,8 @@ export class TaskManagerFactory {
    * Destroy all TaskManager instances
    */
   async destroyAll(): Promise<void> {
-    const shutdownPromises = Array.from(this.instances.values()).map(
-      instance => instance.manager.shutdown()
+    const shutdownPromises = Array.from(this.instances.values()).map((instance) =>
+      instance.manager.shutdown(),
     );
 
     await Promise.all(shutdownPromises);
@@ -221,10 +220,7 @@ export class TaskManagerFactory {
       ...scopeConfig,
     };
 
-    return new TaskManagerFactory(
-      mergedConfig,
-      scopeProjectRoot || this.defaultProjectRoot
-    );
+    return new TaskManagerFactory(mergedConfig, scopeProjectRoot || this.defaultProjectRoot);
   }
 
   /**
@@ -234,8 +230,8 @@ export class TaskManagerFactory {
    * @throws Error if timeout is exceeded
    */
   async waitForAllIdle(timeoutMs?: number): Promise<void> {
-    const promises = Array.from(this.instances.values()).map(
-      instance => instance.manager.whenIdle(timeoutMs)
+    const promises = Array.from(this.instances.values()).map((instance) =>
+      instance.manager.whenIdle(timeoutMs),
     );
 
     await Promise.all(promises);
@@ -248,12 +244,10 @@ export class TaskManagerFactory {
    */
   async areAllIdle(): Promise<boolean> {
     const idleChecks = await Promise.all(
-      Array.from(this.instances.values()).map(
-        instance => instance.manager.isIdle()
-      )
+      Array.from(this.instances.values()).map((instance) => instance.manager.isIdle()),
     );
 
-    return idleChecks.every(idle => idle);
+    return idleChecks.every((idle) => idle);
   }
 
   /**
@@ -283,7 +277,7 @@ export class TaskManagerFactoryPresets {
    */
   static development(): TaskManagerFactory {
     return new TaskManagerFactory({
-      backend: 'memory',
+      backend: "memory",
       maxThreads: 2,
       silent: false,
       jobRecoveryEnabled: false,
@@ -295,7 +289,7 @@ export class TaskManagerFactoryPresets {
    */
   static testing(): TaskManagerFactory {
     return new TaskManagerFactory({
-      backend: 'memory',
+      backend: "memory",
       maxThreads: 1,
       silent: true,
       jobRecoveryEnabled: false,
@@ -305,9 +299,9 @@ export class TaskManagerFactoryPresets {
   /**
    * Create a factory optimized for production with SQLite
    */
-  static productionSQLite(dbPath: string = './queue.db'): TaskManagerFactory {
+  static productionSQLite(dbPath: string = "./queue.db"): TaskManagerFactory {
     return new TaskManagerFactory({
-      backend: 'sqlite',
+      backend: "sqlite",
       databaseUrl: dbPath,
       maxThreads: undefined, // Use system default
       silent: false,
@@ -321,7 +315,7 @@ export class TaskManagerFactoryPresets {
    */
   static productionPostgreSQL(connectionString: string): TaskManagerFactory {
     return new TaskManagerFactory({
-      backend: 'postgresql',
+      backend: "postgresql",
       databaseUrl: connectionString,
       maxThreads: undefined, // Use system default
       silent: false,
@@ -335,7 +329,7 @@ export class TaskManagerFactoryPresets {
    */
   static highPerformance(): TaskManagerFactory {
     return new TaskManagerFactory({
-      backend: 'memory',
+      backend: "memory",
       maxThreads: undefined, // Use all available cores
       silent: true,
       jobRecoveryEnabled: false,

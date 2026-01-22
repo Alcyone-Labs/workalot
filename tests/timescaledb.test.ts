@@ -1,13 +1,13 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { TaskManager } from '../src/api/index.js';
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { TaskManager } from "../src/api/index.js";
 
-describe('TimescaleDB Integration', () => {
+describe("TimescaleDB Integration", () => {
   let manager: TaskManager;
   let isTimescaleAvailable = false;
 
   // Helper function to execute SQL queries with proper environment handling
   async function executeQuery(queue: any, query: string, params?: any[]): Promise<any[]> {
-    const isBunEnvironment = typeof Bun !== 'undefined';
+    const isBunEnvironment = typeof Bun !== "undefined";
     let result;
 
     if (isBunEnvironment) {
@@ -24,19 +24,19 @@ describe('TimescaleDB Integration', () => {
     // Only run this test if TimescaleDB is available
     try {
       manager = new TaskManager({
-        backend: 'postgresql',
-        databaseUrl: 'postgres://postgres:password@localhost:5432/workalot',
+        backend: "postgresql",
+        databaseUrl: "postgres://postgres:password@localhost:5432/workalot",
         enableTimescaleDB: true,
-        chunkTimeInterval: '1 hour',
-        compressionInterval: '7 days',
-        retentionInterval: '90 days',
+        chunkTimeInterval: "1 hour",
+        compressionInterval: "7 days",
+        retentionInterval: "90 days",
         silent: true,
         wsPort: undefined, // Disable WebSocket to avoid port conflicts
       });
       await manager.initialize();
       isTimescaleAvailable = true;
     } catch (error) {
-      console.warn('TimescaleDB not available, skipping tests:', error.message);
+      console.warn("TimescaleDB not available, skipping tests:", error.message);
       isTimescaleAvailable = false;
     }
   });
@@ -47,8 +47,8 @@ describe('TimescaleDB Integration', () => {
     }
   });
 
-  describe('Hypertable Configuration', () => {
-    it('should create hypertable with correct partitioning', async () => {
+  describe("Hypertable Configuration", () => {
+    it("should create hypertable with correct partitioning", async () => {
       if (!isTimescaleAvailable) {
         expect(true).toBe(true);
         return;
@@ -67,12 +67,12 @@ describe('TimescaleDB Integration', () => {
       const result = await executeQuery(queue, hypertableQuery);
 
       expect(result.length).toBe(1);
-      expect(result[0].hypertable_name).toBe('workalot_jobs');
+      expect(result[0].hypertable_name).toBe("workalot_jobs");
       expect(result[0].num_dimensions).toBe(1);
       expect(result[0].compression_enabled).toBe(true);
     });
 
-    it('should have correct primary key structure', async () => {
+    it("should have correct primary key structure", async () => {
       if (!isTimescaleAvailable) {
         expect(true).toBe(true);
         return;
@@ -90,11 +90,11 @@ describe('TimescaleDB Integration', () => {
       `;
 
       const result = await executeQuery(queue, pkQuery);
-      const pkColumns = result.map(row => row.attname);
-      expect(pkColumns).toEqual(['id', 'requested_at']);
+      const pkColumns = result.map((row) => row.attname);
+      expect(pkColumns).toEqual(["id", "requested_at"]);
     });
 
-    it('should have compression policy configured', async () => {
+    it("should have compression policy configured", async () => {
       if (!isTimescaleAvailable) {
         expect(true).toBe(true);
         return;
@@ -112,16 +112,20 @@ describe('TimescaleDB Integration', () => {
       expect(result.length).toBeGreaterThan(0);
 
       // Check for segmentby and orderby settings
-      const segmentBy = result.find(r => r.attname === 'status' && r.segmentby_column_index !== null);
-      const orderBy = result.find(r => r.attname === 'requested_at' && r.orderby_column_index !== null);
+      const segmentBy = result.find(
+        (r) => r.attname === "status" && r.segmentby_column_index !== null,
+      );
+      const orderBy = result.find(
+        (r) => r.attname === "requested_at" && r.orderby_column_index !== null,
+      );
 
       expect(segmentBy).toBeDefined();
       expect(orderBy).toBeDefined();
     });
   });
 
-  describe('Job Scheduling and Storage', () => {
-    it('should schedule jobs with time-series data', async () => {
+  describe("Job Scheduling and Storage", () => {
+    it("should schedule jobs with time-series data", async () => {
       if (!isTimescaleAvailable) {
         expect(true).toBe(true);
         return;
@@ -129,24 +133,24 @@ describe('TimescaleDB Integration', () => {
 
       // Schedule a simple job
       const jobPayload = {
-        jobFile: './tests/fixtures/SimpleTestJob.ts',
+        jobFile: "./tests/fixtures/SimpleTestJob.ts",
         jobPayload: {
           id: 1,
           timestamp: new Date(),
-          data: 'test data',
+          data: "test data",
         },
       };
 
       const jobId = await manager.schedule(jobPayload);
       expect(jobId).toBeDefined();
-      expect(typeof jobId).toBe('string');
+      expect(typeof jobId).toBe("string");
 
       // Verify job was stored
       const stats = await manager.getQueueStats();
       expect(stats.total).toBeGreaterThanOrEqual(1);
     });
 
-    it('should handle multiple jobs with different timestamps', async () => {
+    it("should handle multiple jobs with different timestamps", async () => {
       if (!isTimescaleAvailable) {
         expect(true).toBe(true);
         return;
@@ -158,7 +162,7 @@ describe('TimescaleDB Integration', () => {
 
       for (let i = 0; i < 5; i++) {
         const jobPayload = {
-          jobFile: './tests/fixtures/SimpleTestJob.ts',
+          jobFile: "./tests/fixtures/SimpleTestJob.ts",
           jobPayload: {
             id: i,
             timestamp: new Date(baseTime - i * 3600000), // Each job 1 hour apart
@@ -176,7 +180,7 @@ describe('TimescaleDB Integration', () => {
       expect(uniqueJobs.size).toBe(5);
     });
 
-    it('should store jobs in correct time partitions', async () => {
+    it("should store jobs in correct time partitions", async () => {
       if (!isTimescaleAvailable) {
         expect(true).toBe(true);
         return;
@@ -205,8 +209,8 @@ describe('TimescaleDB Integration', () => {
     });
   });
 
-  describe('Continuous Aggregates', () => {
-    it('should have continuous aggregates for job statistics', async () => {
+  describe("Continuous Aggregates", () => {
+    it("should have continuous aggregates for job statistics", async () => {
       if (!isTimescaleAvailable) {
         expect(true).toBe(true);
         return;
@@ -223,11 +227,11 @@ describe('TimescaleDB Integration', () => {
 
       const result = await executeQuery(queue, caQuery);
       expect(result.length).toBe(1);
-      expect(result[0].view_name).toBe('workalot_job_stats_hourly');
+      expect(result[0].view_name).toBe("workalot_job_stats_hourly");
       expect(result[0].materialized_only).toBe(true);
     });
 
-    it('should have refresh policy for continuous aggregates', async () => {
+    it("should have refresh policy for continuous aggregates", async () => {
       if (!isTimescaleAvailable) {
         expect(true).toBe(true);
         return;
@@ -245,13 +249,13 @@ describe('TimescaleDB Integration', () => {
 
       const result = await executeQuery(queue, policyQuery);
       expect(result.length).toBe(1);
-      expect(result[0].application_name).toContain('Refresh Continuous Aggregate');
+      expect(result[0].application_name).toContain("Refresh Continuous Aggregate");
       expect(result[0].schedule_interval).toBeDefined();
     });
   });
 
-  describe('Performance and Optimization', () => {
-    it('should demonstrate time-based query performance', async () => {
+  describe("Performance and Optimization", () => {
+    it("should demonstrate time-based query performance", async () => {
       if (!isTimescaleAvailable) {
         expect(true).toBe(true);
         return;
@@ -266,7 +270,7 @@ describe('TimescaleDB Integration', () => {
       for (let i = 0; i < 10; i++) {
         const timestamp = new Date(now.getTime() - i * 24 * 60 * 60 * 1000); // Daily intervals
         const jobPayload = {
-          jobFile: './tests/fixtures/SimpleTestJob.ts',
+          jobFile: "./tests/fixtures/SimpleTestJob.ts",
           jobPayload: {
             id: `perf-${i}`,
             timestamp,
@@ -293,7 +297,7 @@ describe('TimescaleDB Integration', () => {
       expect(queryTime).toBeLessThan(1000); // Should be fast
     });
 
-    it('should handle large time ranges efficiently', async () => {
+    it("should handle large time ranges efficiently", async () => {
       if (!isTimescaleAvailable) {
         expect(true).toBe(true);
         return;
@@ -322,8 +326,8 @@ describe('TimescaleDB Integration', () => {
     });
   });
 
-  describe('Configuration Validation', () => {
-    it('should respect chunk time interval configuration', async () => {
+  describe("Configuration Validation", () => {
+    it("should respect chunk time interval configuration", async () => {
       if (!isTimescaleAvailable) {
         expect(true).toBe(true);
         return;
@@ -345,7 +349,7 @@ describe('TimescaleDB Integration', () => {
       expect(parseInt(result[0].interval_length)).toBe(3600000000);
     });
 
-    it('should have retention policy configured', async () => {
+    it("should have retention policy configured", async () => {
       if (!isTimescaleAvailable) {
         expect(true).toBe(true);
         return;
@@ -368,8 +372,8 @@ describe('TimescaleDB Integration', () => {
     });
   });
 
-  describe('Error Handling', () => {
-    it('should handle TimescaleDB-specific errors gracefully', async () => {
+  describe("Error Handling", () => {
+    it("should handle TimescaleDB-specific errors gracefully", async () => {
       if (!isTimescaleAvailable) {
         expect(true).toBe(true);
         return;
@@ -379,11 +383,11 @@ describe('TimescaleDB Integration', () => {
       // For example, trying to insert data with invalid time partitioning
 
       const jobPayload = {
-        jobFile: './tests/fixtures/SimpleTestJob.ts',
+        jobFile: "./tests/fixtures/SimpleTestJob.ts",
         jobPayload: {
-          id: 'error-test',
+          id: "error-test",
           timestamp: new Date(),
-          data: 'error handling test',
+          data: "error handling test",
         },
       };
 

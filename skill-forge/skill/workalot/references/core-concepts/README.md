@@ -5,6 +5,7 @@
 Workalot v2.0 is a high-performance, multi-threaded job queue system for Node.js/Bun.js with WebSocket-based distributed architecture.
 
 **Core Philosophy**:
+
 - Multi-threaded performance over single-threaded simplicity
 - Factory pattern over singleton for testability
 - Backend-agnostic design (Memory/SQLite/PGLite/PostgreSQL/Redis)
@@ -14,6 +15,7 @@ Workalot v2.0 is a high-performance, multi-threaded job queue system for Node.js
 ## When to Use
 
 Use Workalot when you need:
+
 - High-throughput job processing (100K+ jobs/sec with Memory backend)
 - Multi-backend persistence options
 - Distributed worker scaling across machines
@@ -40,10 +42,12 @@ Use Workalot when you need:
 ## Key Decisions
 
 **Choose Worker Architecture**:
+
 - Local (same process): Use `WorkerManager` with in-process worker threads
 - Distributed (multi-machine): Use `WorkerManagerWS` with WebSocket + `SimpleOrchestrator`
 
 **Choose Backend**:
+
 - Development/Testing: Memory backend (fastest, no persistence)
 - Single machine prod: SQLite (file-based, WAL mode)
 - Distributed prod: PostgreSQL (enterprise features, replication)
@@ -51,6 +55,7 @@ Use Workalot when you need:
 - Edge computing: Redis (Upstash) or PGLite (WASM PostgreSQL)
 
 **Choose Pattern**:
+
 - Simple use: `scheduleAndWait()` with default singleton
 - Multiple instances: `createTaskManager(name, config)` factory pattern
 - Testing: Factory with isolated instances, in-memory backend
@@ -59,6 +64,7 @@ Use Workalot when you need:
 ## Migration Path
 
 **v1.x → v2.x**:
+
 - `WorkerManager` (postMessage) → `WorkerManagerWS` (WebSocket)
 - `initializeTaskManager()` → `createTaskManager(name, config)`
 - Singleton pattern → Factory pattern (recommended)
@@ -66,6 +72,7 @@ Use Workalot when you need:
 ## Core Workflows
 
 ### Basic Job Scheduling
+
 ```typescript
 import { scheduleAndWait } from "#/index.js";
 const result = await scheduleAndWait({
@@ -75,14 +82,18 @@ const result = await scheduleAndWait({
 ```
 
 ### Factory Pattern (Recommended)
+
 ```typescript
 import { createTaskManager, scheduleAndWaitWith } from "#/index.js";
 const manager = await createTaskManager("main", { backend: "sqlite" });
-const result = await scheduleAndWaitWith(manager, { /* job */ });
+const result = await scheduleAndWaitWith(manager, {
+  /* job */
+});
 await destroyTaskManager("main");
 ```
 
 ### Distributed Setup
+
 ```typescript
 // Orchestrator
 import { SimpleOrchestrator } from "#/index.js";

@@ -5,6 +5,7 @@
 Jobs in Workalot are TypeScript/JavaScript classes extending `BaseJob`. Each job implements the `IJob` interface with a `run()` method.
 
 **Key Concepts**:
+
 - Jobs are isolated: Each runs in its own worker thread
 - Jobs are async: Use async/await in `run()` method
 - Jobs are type-safe: Explicit payload and result types
@@ -13,6 +14,7 @@ Jobs in Workalot are TypeScript/JavaScript classes extending `BaseJob`. Each job
 ## When to Use Custom Jobs
 
 Use custom jobs when you need:
+
 - Data processing (transformations, aggregations)
 - API calls (external services, webhooks)
 - File operations (parsing, conversion, compression)
@@ -93,10 +95,7 @@ export default class APICallJob extends BaseJob implements IJob {
 
       return this.success({ data, fetchedAt: new Date() });
     } catch (error) {
-      return this.error(
-        `API call failed: ${error}`,
-        { url: payload.url }
-      );
+      return this.error(`API call failed: ${error}`, { url: payload.url });
     }
   }
 }
@@ -117,10 +116,7 @@ export default class FileProcessJob extends BaseJob implements IJob {
 
       return this.success({ lines, processedAt: new Date() });
     } catch (error) {
-      return this.error(
-        `File processing failed: ${error}`,
-        { filePath: payload.filePath }
-      );
+      return this.error(`File processing failed: ${error}`, { filePath: payload.filePath });
     }
   }
 }
@@ -244,7 +240,7 @@ export default class LongRunningJob extends BaseJob implements IJob {
 
   private async processItem(index: number): Promise<void> {
     // Simulate work
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
   }
 }
 ```

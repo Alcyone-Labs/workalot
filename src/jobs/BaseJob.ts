@@ -22,10 +22,7 @@ export abstract class BaseJob implements IJob {
     return ulid();
   }
 
-  protected validatePayload(
-    payload: Record<string, any>,
-    requiredFields: string[],
-  ): void {
+  protected validatePayload(payload: Record<string, any>, requiredFields: string[]): void {
     for (const field of requiredFields) {
       if (!(field in payload)) {
         throw new Error(`Missing required field in payload: ${field}`);
@@ -33,9 +30,7 @@ export abstract class BaseJob implements IJob {
     }
   }
 
-  protected createSuccessResult(
-    data: Record<string, any>,
-  ): Record<string, any> {
+  protected createSuccessResult(data: Record<string, any>): Record<string, any> {
     return {
       success: true,
       data,
@@ -43,10 +38,7 @@ export abstract class BaseJob implements IJob {
     };
   }
 
-  protected createErrorResult(
-    message: string,
-    details?: Record<string, any>,
-  ): Record<string, any> {
+  protected createErrorResult(message: string, details?: Record<string, any>): Record<string, any> {
     return {
       success: false,
       error: message,

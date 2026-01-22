@@ -12,6 +12,7 @@ references:
 ## When to Apply
 
 Use Workalot when you need:
+
 - High-throughput job processing (100K+ jobs/sec with Memory backend)
 - Multi-backend persistence options (Memory/SQLite/PGLite/PostgreSQL/Redis)
 - Distributed worker scaling across machines or containers
@@ -22,6 +23,7 @@ Use Workalot when you need:
 ## Rules
 
 **Always Follow**:
+
 - Use factory pattern (`createTaskManager`) over singleton for testability and multiple instances
 - Extend jobs from `BaseJob` and implement `IJob` interface
 - Use `scheduleAndWaitWith(manager)` for explicit manager control
@@ -36,6 +38,7 @@ Use Workalot when you need:
 - Choose backend based on use case: Memory (dev/test), SQLite (single-machine), PostgreSQL (enterprise), Redis (high-throughput)
 
 **Never**:
+
 - Use singleton pattern in tests (creates shared state)
 - Mix v1.x `postMessage` with v2.x WebSocket patterns
 - Hardcode database URLs or secrets
@@ -160,11 +163,7 @@ if (result.success) {
 ### Example 2: Factory Pattern with Multiple Queues
 
 ```typescript
-import {
-  createTaskManager,
-  scheduleAndWaitWith,
-  destroyTaskManager,
-} from "#/index.js";
+import { createTaskManager, scheduleAndWaitWith, destroyTaskManager } from "#/index.js";
 
 // Create separate instances
 const mainQueue = await createTaskManager("main", {
@@ -189,10 +188,7 @@ const normalJob = await scheduleAndWaitWith(mainQueue, {
 });
 
 // Cleanup both
-await Promise.all([
-  destroyTaskManager("main"),
-  destroyTaskManager("priority"),
-]);
+await Promise.all([destroyTaskManager("main"), destroyTaskManager("priority")]);
 ```
 
 **Output**: Jobs routed to appropriate queues, both cleaned up

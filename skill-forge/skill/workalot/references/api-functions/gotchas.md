@@ -9,12 +9,15 @@
 **Symptoms**: Flaky tests, state leakage between tests
 
 **Fix**:
+
 ```typescript
 // BAD - Tests share singleton
 import { scheduleAndWait } from "#/index.js";
 
 test("test 1", async () => {
-  const result = await scheduleAndWait({ /* job */ });
+  const result = await scheduleAndWait({
+    /* job */
+  });
   // Test 2 sees this job!
 });
 
@@ -32,7 +35,9 @@ afterEach(async () => {
 });
 
 test("test 1", async () => {
-  const result = await scheduleAndWaitWith(manager, { /* job */ });
+  const result = await scheduleAndWaitWith(manager, {
+    /* job */
+  });
   // Test 2 is isolated
 });
 ```
@@ -44,17 +49,28 @@ test("test 1", async () => {
 **Symptoms**: "TaskManager 'main' already exists" errors
 
 **Fix**:
+
 ```typescript
 // BAD - Same name used everywhere
-const main1 = await createTaskManager("main", { /* config */ });
-const main2 = await createTaskManager("main", { /* config */ }); // Error!
+const main1 = await createTaskManager("main", {
+  /* config */
+});
+const main2 = await createTaskManager("main", {
+  /* config */
+}); // Error!
 
 // GOOD - Use unique names or factory pattern
-const orderManager = await createTaskManager("orders", { /* config */ });
-const inventoryManager = await createTaskManager("inventory", { /* config */ });
+const orderManager = await createTaskManager("orders", {
+  /* config */
+});
+const inventoryManager = await createTaskManager("inventory", {
+  /* config */
+});
 
 // Or use factory for multiple instances
-const factory = new TaskManagerFactory({ /* config */ });
+const factory = new TaskManagerFactory({
+  /* config */
+});
 const manager1 = await factory.create("instance1");
 const manager2 = await factory.create("instance2");
 ```
@@ -68,11 +84,14 @@ const manager2 = await factory.create("instance2");
 **Symptoms**: Connection pool exhaustion, high memory usage, process hangs on exit
 
 **Fix**:
+
 ```typescript
 // BAD - Never destroyed
 class Service {
   async start() {
-    this.manager = await createTaskManager("service", { /* config */ });
+    this.manager = await createTaskManager("service", {
+      /* config */
+    });
   }
 
   async stop() {
@@ -105,14 +124,21 @@ class Service {
 **Symptoms**: Jobs scheduled to wrong queue, errors, undefined behavior
 
 **Fix**:
+
 ```typescript
 // BAD - Mixed usage
-const factory = new TaskManagerFactory({ /* config */ });
+const factory = new TaskManagerFactory({
+  /* config */
+});
 const manager = await factory.create("main");
-const result = await scheduleAndWait({ /* job */ }); // Uses singleton!
+const result = await scheduleAndWait({
+  /* job */
+}); // Uses singleton!
 
 // GOOD - Use manager-specific functions
-const result = await scheduleAndWaitWith(manager, { /* job */ });
+const result = await scheduleAndWaitWith(manager, {
+  /* job */
+});
 ```
 
 ## Job Request Pitfalls
@@ -124,17 +150,22 @@ const result = await scheduleAndWaitWith(manager, { /* job */ });
 **Symptoms**: `Job file not found or not readable` errors
 
 **Fix**:
+
 ```typescript
 // BAD - Wrong path
 const result = await scheduleAndWait({
   jobFile: "./jobs/MyJob.ts", // Resolved relative to wrong location
-  jobPayload: { /* ... */ },
+  jobPayload: {
+    /* ... */
+  },
 });
 
 // GOOD - Use paths relative to project root
 const result = await scheduleAndWait({
   jobFile: "jobs/MyJob.ts", // Resolved from project root
-  jobPayload: { /* ... */ },
+  jobPayload: {
+    /* ... */
+  },
 });
 ```
 
@@ -145,17 +176,22 @@ const result = await scheduleAndWait({
 **Symptoms**: Jobs never complete, queue stalls, high processing count
 
 **Fix**:
+
 ```typescript
 // BAD - No timeout
 const result = await scheduleAndWait({
   jobFile: "jobs/InfiniteJob.ts",
-  jobPayload: { /* ... */ },
+  jobPayload: {
+    /* ... */
+  },
 });
 
 // GOOD - Set reasonable timeout
 const result = await scheduleAndWait({
   jobFile: "jobs/LongJob.ts",
-  jobPayload: { /* ... */ },
+  jobPayload: {
+    /* ... */
+  },
   jobTimeout: 30000, // 30 seconds
 });
 ```
@@ -167,6 +203,7 @@ const result = await scheduleAndWait({
 **Symptoms**: Out of memory errors, slow scheduling, worker crashes
 
 **Fix**:
+
 ```typescript
 // BAD - Large direct payload
 const result = await scheduleAndWait({
@@ -195,6 +232,7 @@ const data = await loadFromS3(payload._ref);
 **Symptoms**: Jobs disappear after restart, data loss
 
 **Fix**:
+
 ```typescript
 // BAD - Production with memory
 const manager = await createTaskManager("prod", {
@@ -215,6 +253,7 @@ const manager = await createTaskManager("prod", {
 **Symptoms**: Jobs waiting, slow processing, high latency
 
 **Fix**:
+
 ```typescript
 // BAD - Only 2 workers on 8-core machine
 const manager = await createTaskManager("main", {
@@ -234,6 +273,7 @@ const manager = await createTaskManager("main", {
 **Symptoms**: Slow jobs, high CPU usage, large log files
 
 **Fix**:
+
 ```typescript
 // BAD - Verbose logging in production
 const manager = await createTaskManager("prod", {
@@ -255,6 +295,7 @@ const manager = await createTaskManager("prod", {
 **Symptoms**: High CPU usage, slowed job processing
 
 **Fix**:
+
 ```typescript
 // BAD - Check every 100ms
 setInterval(async () => {
@@ -276,6 +317,7 @@ setInterval(async () => {
 **Symptoms**: Jobs marked as processing but never complete
 
 **Fix**:
+
 ```typescript
 // BAD - Immediate shutdown
 async function shutdown() {
@@ -303,10 +345,13 @@ async function shutdown() {
 **Symptoms**: Silent failures, incorrect results, hard to debug
 
 **Fix**:
+
 ```typescript
 // BAD - Silently catches errors
 try {
-  const result = await scheduleAndWait({ /* job */ });
+  const result = await scheduleAndWait({
+    /* job */
+  });
   return result;
 } catch (error) {
   console.error(error);
@@ -315,7 +360,9 @@ try {
 
 // GOOD - Propagate errors
 try {
-  const result = await scheduleAndWait({ /* job */ });
+  const result = await scheduleAndWait({
+    /* job */
+  });
   return result;
 } catch (error) {
   console.error("Job failed:", error);
@@ -330,8 +377,11 @@ try {
 **Symptoms**: Processing failed data, cascading errors
 
 **Fix**:
+
 ```typescript
-const result = await scheduleAndWait({ /* job */ });
+const result = await scheduleAndWait({
+  /* job */
+});
 
 // BAD - Doesn't check
 console.log("Result:", result.result);
@@ -353,6 +403,7 @@ if (result.success) {
 **Symptoms**: Connection errors, resource leaks, connection timeouts
 
 **Fix**:
+
 ```typescript
 // BAD - Connection never closed
 class DatabaseService {
@@ -389,9 +440,12 @@ class DatabaseService {
 **Symptoms**: Memory usage grows over time, OOM errors
 
 **Fix**:
+
 ```typescript
 // BAD - Workers never cleaned up
-const manager = await createTaskManager("main", { /* config */ });
+const manager = await createTaskManager("main", {
+  /* config */
+});
 
 // Never destroyed!
 

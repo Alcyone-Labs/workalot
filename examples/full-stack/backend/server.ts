@@ -50,7 +50,7 @@ const app = new Elysia()
     staticPlugin({
       assets: "examples/full-stack/frontend",
       prefix: "/",
-    })
+    }),
   )
 
   // Health check
@@ -134,8 +134,7 @@ const app = new Elysia()
   // Get all jobs
   .get("/api/jobs", async () => {
     const jobs = Array.from(jobMetadata.values()).sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
     return { jobs, total: jobs.length };
   })
@@ -151,18 +150,15 @@ const app = new Elysia()
       jobs: {
         total: jobMetadata.size,
         byStatus: {
-          pending: Array.from(jobMetadata.values()).filter(
-            (j) => j.status === JobStatus.PENDING
-          ).length,
-          running: Array.from(jobMetadata.values()).filter(
-            (j) => j.status === JobStatus.PROCESSING
-          ).length,
+          pending: Array.from(jobMetadata.values()).filter((j) => j.status === JobStatus.PENDING)
+            .length,
+          running: Array.from(jobMetadata.values()).filter((j) => j.status === JobStatus.PROCESSING)
+            .length,
           completed: Array.from(jobMetadata.values()).filter(
-            (j) => j.status === JobStatus.COMPLETED
+            (j) => j.status === JobStatus.COMPLETED,
           ).length,
-          failed: Array.from(jobMetadata.values()).filter(
-            (j) => j.status === JobStatus.FAILED
-          ).length,
+          failed: Array.from(jobMetadata.values()).filter((j) => j.status === JobStatus.FAILED)
+            .length,
         },
       },
     };
@@ -223,9 +219,7 @@ async function monitorJob(jobId: string): Promise<void> {
       }
 
       // Check for running jobs
-      const runningJobs = await taskManager.getJobsByStatus(
-        JobStatus.PROCESSING
-      );
+      const runningJobs = await taskManager.getJobsByStatus(JobStatus.PROCESSING);
       const runningJob = runningJobs.find((j) => j.id === jobId);
 
       if (runningJob) {

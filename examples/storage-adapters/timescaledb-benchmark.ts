@@ -17,7 +17,7 @@ interface BenchmarkResult {
 
 async function runBenchmark(name: string, config: any, jobCount: number): Promise<BenchmarkResult> {
   console.log(`\n🔄 Running ${name} benchmark with ${jobCount} jobs...`);
-  
+
   const manager = new TaskManager(config);
   await manager.initialize();
 
@@ -28,7 +28,7 @@ async function runBenchmark(name: string, config: any, jobCount: number): Promis
   for (let i = 0; i < jobCount; i++) {
     const timestamp = new Date(Date.now() - i * 60000); // 1 minute intervals
     const jobPayload = {
-      jobFile: './tests/fixtures/SimpleTestJob.ts',
+      jobFile: "./tests/fixtures/SimpleTestJob.ts",
       jobPayload: {
         id: `bench-${i}`,
         timestamp,
@@ -45,7 +45,7 @@ async function runBenchmark(name: string, config: any, jobCount: number): Promis
   // Test query performance
   const queue = (manager as any).queueManager;
   const queryStartTime = Date.now();
-  
+
   // Query recent jobs (time-based query that benefits from TimescaleDB)
   const recentQuery = `
     SELECT COUNT(*) as count
@@ -53,7 +53,7 @@ async function runBenchmark(name: string, config: any, jobCount: number): Promis
     WHERE requested_at >= NOW() - INTERVAL '1 hour'
   `;
 
-  const isBunEnvironment = typeof Bun !== 'undefined';
+  const isBunEnvironment = typeof Bun !== "undefined";
   let result;
   if (isBunEnvironment) {
     result = await queue.sql.unsafe(recentQuery);
@@ -107,17 +107,17 @@ async function main() {
     const timescaleResult = await runBenchmark(
       `TimescaleDB (${jobCount} jobs)`,
       timescaleConfig,
-      jobCount
+      jobCount,
     );
     results.push(timescaleResult);
 
     // Small delay between benchmarks
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 
   // Display results
   console.log("\n📊 Benchmark Results:");
-  console.log("=" .repeat(80));
+  console.log("=".repeat(80));
   console.log("| Configuration        | Jobs | Duration (ms) | Jobs/sec | Query Time (ms) |");
   console.log("|" + "-".repeat(78) + "|");
 
@@ -127,10 +127,10 @@ async function main() {
     const duration = result.duration.toString().padStart(11);
     const jobsPerSec = result.jobsPerSecond.toString().padStart(8);
     const queryTime = result.avgQueryTime.toString().padStart(13);
-    
+
     console.log(`| ${name} | ${jobs} | ${duration} | ${jobsPerSec} | ${queryTime} |`);
   }
-  console.log("=" .repeat(80));
+  console.log("=".repeat(80));
 
   // Performance insights
   console.log("\n💡 TimescaleDB Benefits:");

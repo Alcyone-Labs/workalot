@@ -160,44 +160,29 @@ export abstract class BaseWorker extends EventEmitter {
    */
   protected setupMessageHandlers(): void {
     // Handle fill queue messages
-    this.wsClient.on(
-      `message:${WorkerMessageType.FILL_QUEUE}`,
-      async (message) => {
-        await this.handleFillQueue(message);
-      },
-    );
+    this.wsClient.on(`message:${WorkerMessageType.FILL_QUEUE}`, async (message) => {
+      await this.handleFillQueue(message);
+    });
 
     // Handle direct job execution (non-queue mode)
-    this.wsClient.on(
-      `message:${WorkerMessageType.EXECUTE_JOB}`,
-      async (message) => {
-        await this.handleDirectJobExecution(message);
-      },
-    );
+    this.wsClient.on(`message:${WorkerMessageType.EXECUTE_JOB}`, async (message) => {
+      await this.handleDirectJobExecution(message);
+    });
 
     // Handle batch job execution
-    this.wsClient.on(
-      `message:${WorkerMessageType.EXECUTE_BATCH_JOBS}`,
-      async (message) => {
-        await this.handleBatchJobExecution(message);
-      },
-    );
+    this.wsClient.on(`message:${WorkerMessageType.EXECUTE_BATCH_JOBS}`, async (message) => {
+      await this.handleBatchJobExecution(message);
+    });
 
     // Handle job acknowledgment
-    this.wsClient.on(
-      `message:${WorkerMessageType.JOB_ACK}`,
-      async (message) => {
-        await this.handleJobAck(message);
-      },
-    );
+    this.wsClient.on(`message:${WorkerMessageType.JOB_ACK}`, async (message) => {
+      await this.handleJobAck(message);
+    });
 
     // Handle queue status request
-    this.wsClient.on(
-      `message:${WorkerMessageType.QUEUE_STATUS}`,
-      async (message) => {
-        await this.handleQueueStatusRequest(message);
-      },
-    );
+    this.wsClient.on(`message:${WorkerMessageType.QUEUE_STATUS}`, async (message) => {
+      await this.handleQueueStatusRequest(message);
+    });
 
     // Handle custom messages
     this.wsClient.on("message", async (message) => {
@@ -231,11 +216,7 @@ export abstract class BaseWorker extends EventEmitter {
 
     // Handle job completion
     this.localQueue.on("job-completed", async (data) => {
-      await this.reportJobCompletion(
-        data.jobId,
-        data.result,
-        data.processingTime,
-      );
+      await this.reportJobCompletion(data.jobId, data.result, data.processingTime);
     });
 
     // Handle job failure
@@ -289,10 +270,7 @@ export abstract class BaseWorker extends EventEmitter {
 
       // Execute job asynchronously
       this.executeJob(job).catch((error) => {
-        this.log(
-          `Worker ${this.config.workerId}: Error executing job ${job.jobId}:`,
-          error,
-        );
+        this.log(`Worker ${this.config.workerId}: Error executing job ${job.jobId}:`, error);
       });
 
       jobsProcessed++;
@@ -316,8 +294,7 @@ export abstract class BaseWorker extends EventEmitter {
       // Update stats
       this.stats.jobsProcessed++;
       this.stats.totalProcessingTime += processingTime;
-      this.stats.averageProcessingTime =
-        this.stats.totalProcessingTime / this.stats.jobsProcessed;
+      this.stats.averageProcessingTime = this.stats.totalProcessingTime / this.stats.jobsProcessed;
 
       // Mark job as complete
       if (this.localQueue) {
@@ -329,17 +306,13 @@ export abstract class BaseWorker extends EventEmitter {
       // Call lifecycle hook
       await this.afterJobExecution(job, result, processingTime);
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
       const processingTime = Date.now() - startTime;
 
       // Update stats
       this.stats.jobsFailed++;
 
-      this.log(
-        `Worker ${this.config.workerId}: Job ${job.jobId} failed:`,
-        error,
-      );
+      this.log(`Worker ${this.config.workerId}: Job ${job.jobId} failed:`, error);
 
       // Mark job as failed
       if (this.localQueue) {
@@ -391,9 +364,7 @@ export abstract class BaseWorker extends EventEmitter {
 
       await this.localQueue.receiveJobs(filteredJobs);
 
-      this.log(
-        `Worker ${this.config.workerId}: Received ${filteredJobs.length} jobs`,
-      );
+      this.log(`Worker ${this.config.workerId}: Received ${filteredJobs.length} jobs`);
 
       // Call lifecycle hook
       await this.afterQueueFill(filteredJobs);
@@ -406,9 +377,7 @@ export abstract class BaseWorker extends EventEmitter {
   /**
    * Handle direct job execution (non-queue mode)
    */
-  protected async handleDirectJobExecution(
-    message: WorkerMessage,
-  ): Promise<void> {
+  protected async handleDirectJobExecution(message: WorkerMessage): Promise<void> {
     if (!this.isReady) {
       await this.sendMessage({
         type: WorkerMessageType.JOB_ERROR,
@@ -422,10 +391,7 @@ export abstract class BaseWorker extends EventEmitter {
     const { jobPayload, context } = message.payload;
 
     try {
-      const result = await this.jobExecutor.executeJob(
-        jobPayload as JobPayload,
-        context,
-      );
+      const result = await this.jobExecutor.executeJob(jobPayload as JobPayload, context);
 
       await this.sendMessage({
         type: WorkerMessageType.JOB_RESULT,
@@ -458,9 +424,7 @@ export abstract class BaseWorker extends EventEmitter {
   /**
    * Handle batch job execution
    */
-  protected async handleBatchJobExecution(
-    message: WorkerMessage,
-  ): Promise<void> {
+  protected async handleBatchJobExecution(message: WorkerMessage): Promise<void> {
     if (!this.isReady) {
       await this.sendMessage({
         type: WorkerMessageType.JOB_ERROR,
@@ -478,10 +442,7 @@ export abstract class BaseWorker extends EventEmitter {
 
     for (const job of batchJobs) {
       try {
-        const result = await this.jobExecutor.executeJob(
-          job.jobPayload,
-          job.context,
-        );
+        const result = await this.jobExecutor.executeJob(job.jobPayload, job.context);
 
         results.push({
           jobId: job.context.jobId,
@@ -538,9 +499,7 @@ export abstract class BaseWorker extends EventEmitter {
   /**
    * Handle queue status request
    */
-  protected async handleQueueStatusRequest(
-    message: WorkerMessage,
-  ): Promise<void> {
+  protected async handleQueueStatusRequest(message: WorkerMessage): Promise<void> {
     const status = this.getQueueStatus();
 
     await this.sendMessage({
@@ -763,9 +722,7 @@ export abstract class BaseWorker extends EventEmitter {
    * Called before filling the queue
    * Can filter or transform jobs
    */
-  protected async beforeQueueFill(
-    jobs: BatchJobContext[],
-  ): Promise<BatchJobContext[]> {
+  protected async beforeQueueFill(jobs: BatchJobContext[]): Promise<BatchJobContext[]> {
     // Override in subclass
     return jobs;
   }

@@ -140,7 +140,7 @@ export interface IJob {
    */
   run(
     payload: Record<string, any>,
-    context: JobExecutionContext
+    context: JobExecutionContext,
   ): Promise<Record<string, any>> | Record<string, any>;
 }
 

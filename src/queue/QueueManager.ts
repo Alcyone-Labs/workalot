@@ -1,24 +1,19 @@
-import { writeFile, readFile, access, constants } from 'node:fs/promises';
-import { ulid } from 'ulidx';
-import {
-  QueueItem,
-  JobStatus,
-  JobPayload,
-  JobResult,
-  QueueConfig
-} from '../types/index.js';
-import { IQueueBackend, QueueStats } from './IQueueBackend.js';
+import { writeFile, readFile, access, constants, mkdir } from "node:fs/promises";
+import { dirname } from "node:path";
+import { ulid } from "ulidx";
+import { QueueItem, JobStatus, JobPayload, JobResult, QueueConfig } from "../types/index.js";
+import { IQueueBackend, QueueStats } from "./IQueueBackend.js";
 
 /**
  * Events emitted by the QueueManager
  */
 export interface QueueManagerEvents {
-  'item-added': (item: QueueItem) => void;
-  'item-updated': (item: QueueItem) => void;
-  'item-completed': (item: QueueItem) => void;
-  'item-failed': (item: QueueItem) => void;
-  'queue-empty': () => void;
-  'queue-not-empty': () => void;
+  "item-added": (item: QueueItem) => void;
+  "item-updated": (item: QueueItem) => void;
+  "item-completed": (item: QueueItem) => void;
+  "item-failed": (item: QueueItem) => void;
+  "queue-empty": () => void;
+  "queue-not-empty": () => void;
 }
 
 /**
@@ -49,7 +44,7 @@ export class QueueManager extends IQueueBackend {
    */
   async addJob(jobPayload: JobPayload, customId?: string): Promise<string> {
     if (this.isShuttingDown) {
-      throw new Error('Queue is shutting down, cannot add new jobs');
+      throw new Error("Queue is shutting down, cannot add new jobs");
     }
 
     const id = customId || ulid();
@@ -65,16 +60,16 @@ export class QueueManager extends IQueueBackend {
       jobPayload,
       status: JobStatus.PENDING,
       lastUpdated: now,
-      requestedAt: now
+      requestedAt: now,
     };
 
     this.queue.set(id, queueItem);
     this.pendingQueue.push(queueItem); // Add to fast pending queue
-    this.emit('item-added', queueItem);
+    this.emit("item-added", queueItem);
 
     // Check if queue was empty before
     if (this.queue.size === 1) {
-      this.emit('queue-not-empty');
+      this.emit("queue-not-empty");
     }
 
     // Schedule persistence
@@ -98,7 +93,7 @@ export class QueueManager extends IQueueBackend {
     status: JobStatus,
     result?: JobResult,
     error?: Error,
-    workerId?: number
+    workerId?: number,
   ): Promise<boolean> {
     const item = this.queue.get(id);
     if (!item) {
@@ -120,16 +115,16 @@ export class QueueManager extends IQueueBackend {
       case JobStatus.COMPLETED:
         item.completedAt = now;
         item.result = result;
-        this.emit('item-completed', item);
+        this.emit("item-completed", item);
         break;
       case JobStatus.FAILED:
         item.completedAt = now;
         item.error = error;
-        this.emit('item-failed', item);
+        this.emit("item-failed", item);
         break;
     }
 
-    this.emit('item-updated', item);
+    this.emit("item-updated", item);
     this.schedulePersistence();
 
     return true;
@@ -204,7 +199,7 @@ export class QueueManager extends IQueueBackend {
    * Gets all jobs with a specific status
    */
   async getJobsByStatus(status: JobStatus): Promise<QueueItem[]> {
-    return Array.from(this.queue.values()).filter(item => item.status === status);
+    return Array.from(this.queue.values()).filter((item) => item.status === status);
   }
 
   /**
@@ -224,7 +219,7 @@ export class QueueManager extends IQueueBackend {
       processing: 0,
       completed: 0,
       failed: 0,
-      oldestPending: undefined as Date | undefined
+      oldestPending: undefined as Date | undefined,
     };
 
     let oldestPendingTime: number | undefined;
@@ -272,10 +267,10 @@ export class QueueManager extends IQueueBackend {
 
     if (removedCount > 0) {
       this.schedulePersistence();
-      
+
       // Check if queue became empty
       if (this.queue.size === 0) {
-        this.emit('queue-empty');
+        this.emit("queue-empty");
       }
     }
 
@@ -316,7 +311,7 @@ export class QueueManager extends IQueueBackend {
   async loadFromFile(): Promise<number> {
     try {
       await access(this.config.persistenceFile, constants.R_OK);
-      const data = await readFile(this.config.persistenceFile, 'utf-8');
+      const data = await readFile(this.config.persistenceFile, "utf-8");
       const items: QueueItem[] = JSON.parse(data);
 
       let loadedCount = 0;
@@ -340,11 +335,15 @@ export class QueueManager extends IQueueBackend {
       console.log(`Loaded ${loadedCount} jobs from ${this.config.persistenceFile}`);
       return loadedCount;
     } catch (error) {
-      if ((error as any).code === 'ENOENT') {
-        console.log(`No persistence file found at ${this.config.persistenceFile}, starting with empty queue`);
+      if ((error as any).code === "ENOENT") {
+        console.log(
+          `No persistence file found at ${this.config.persistenceFile}, starting with empty queue`,
+        );
         return 0;
       }
-      throw new Error(`Failed to load queue state: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        `Failed to load queue state: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
@@ -353,11 +352,15 @@ export class QueueManager extends IQueueBackend {
    */
   async saveToFile(): Promise<void> {
     try {
+      const dir = dirname(this.config.persistenceFile);
+      await mkdir(dir, { recursive: true });
       const items = Array.from(this.queue.values());
       const data = JSON.stringify(items, null, 2);
-      await writeFile(this.config.persistenceFile, data, 'utf-8');
+      await writeFile(this.config.persistenceFile, data, "utf-8");
     } catch (error) {
-      console.error(`Failed to save queue state: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(
+        `Failed to save queue state: ${error instanceof Error ? error.message : String(error)}`,
+      );
       throw error;
     }
   }
@@ -443,18 +446,20 @@ export class QueueManager extends IQueueBackend {
    */
   private setupGracefulShutdown(): void {
     // Only set up handlers if not in test environment or benchmark environment
-    if (process.env.NODE_ENV !== 'test' &&
-        process.env.VITEST !== 'true' &&
-        !process.env.WORKALOT_BENCHMARK) {
+    if (
+      process.env.NODE_ENV !== "test" &&
+      process.env.VITEST !== "true" &&
+      !process.env.WORKALOT_BENCHMARK
+    ) {
       const shutdownHandler = async () => {
-        console.log('Shutting down queue manager...');
+        console.log("Shutting down queue manager...");
         await this.shutdown();
         process.exit(0);
       };
 
-      process.on('SIGINT', shutdownHandler);
-      process.on('SIGTERM', shutdownHandler);
-      process.on('beforeExit', () => {
+      process.on("SIGINT", shutdownHandler);
+      process.on("SIGTERM", shutdownHandler);
+      process.on("beforeExit", () => {
         if (!this.isShuttingDown) {
           this.saveToFile().catch(console.error);
         }

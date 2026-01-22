@@ -9,6 +9,7 @@
 **Symptoms**: Jobs don't execute properly, workers confused about queue
 
 **Fix**:
+
 ```typescript
 // BAD - Singleton with distributed workers
 await initializeTaskManager({ backend: "sqlite" });
@@ -34,15 +35,16 @@ const orchestrator = new SimpleOrchestrator({
 **Symptoms**: Jobs assigned to wrong worker, inconsistent behavior
 
 **Fix**:
+
 ```typescript
 // BAD - Duplicate worker IDs
-const worker1 = new SimpleWorker({ workerId: 1, /* ... */ });
-const worker2 = new SimpleWorker({ workerId: 1, /* ... */ }); // Collision!
+const worker1 = new SimpleWorker({ workerId: 1 /* ... */ });
+const worker2 = new SimpleWorker({ workerId: 1 /* ... */ }); // Collision!
 
 // GOOD - Unique worker IDs
 const workers = [];
 for (let i = 0; i < numWorkers; i++) {
-  workers.push(new SimpleWorker({ workerId: i + 1, /* ... */ }));
+  workers.push(new SimpleWorker({ workerId: i + 1 /* ... */ }));
 }
 
 // Or use container/hostname-based IDs
@@ -56,11 +58,13 @@ const workerId = process.env.WORKER_ID || `worker-${os.hostname()}-${process.pid
 **Symptoms**: Queue backlog grows, throughput degrades, workers appear stuck
 
 **Fix**:
+
 ```typescript
 // BAD - Blocking job
 export default class BlockingJob extends BaseJob {
   async run(payload: any): Promise<any> {
-    while (true) { // Infinite loop
+    while (true) {
+      // Infinite loop
       // Process forever - never yields!
     }
   }
@@ -76,7 +80,7 @@ export default class NonBlockingJob extends BaseJob {
 
       // Yield to worker thread
       if (i % 10 === 0) {
-        await new Promise(resolve => setImmediate(resolve));
+        await new Promise((resolve) => setImmediate(resolve));
       }
     }
 
@@ -92,9 +96,12 @@ export default class NonBlockingJob extends BaseJob {
 **Symptoms**: Custom job processing doesn't execute, errors
 
 **Fix**:
+
 ```typescript
 // BAD - Using SimpleWorker directly
-const worker = new SimpleWorker({ /* ... */ });
+const worker = new SimpleWorker({
+  /* ... */
+});
 // Can't add custom message handling!
 
 // GOOD - Extend SimpleWorker
@@ -113,7 +120,9 @@ class CustomWorker extends SimpleWorker {
   }
 }
 
-const worker = new CustomWorker({ /* ... */ });
+const worker = new CustomWorker({
+  /* ... */
+});
 ```
 
 ### Ignoring WebSocket Connection Events
@@ -123,9 +132,12 @@ const worker = new CustomWorker({ /* ... */ });
 **Symptoms**: Workers stop receiving jobs silently, orchestrator thinks workers are online
 
 **Fix**:
+
 ```typescript
 // BAD - No error handling
-const worker = new SimpleWorker({ /* ... */ });
+const worker = new SimpleWorker({
+  /* ... */
+});
 
 await worker.start(); // If connection fails, throws!
 
@@ -145,7 +157,7 @@ class RobustWorker extends SimpleWorker {
 
         console.warn(`Connection failed, retrying in ${delay}ms`, error);
 
-        await new Promise(resolve => setTimeout(resolve, delay));
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
 
@@ -162,14 +174,19 @@ class RobustWorker extends SimpleWorker {
 **Symptoms**: Unpredictable routing, some messages not handled
 
 **Fix**:
+
 ```typescript
 // BAD - Duplicate channel routes
 server.registerChannelRoute({
-  handler: (connection, message) => { /* handler 1 */ },
+  handler: (connection, message) => {
+    /* handler 1 */
+  },
 });
 
 server.registerChannelRoute({
-  handler: (connection, message) => { /* handler 2 */ }, // Conflicts!
+  handler: (connection, message) => {
+    /* handler 2 */
+  }, // Conflicts!
 });
 
 // GOOD - Single handler with channel switching
@@ -197,6 +214,7 @@ server.registerChannelRoute({
 **Symptoms**: Jobs hang forever, marked as processing, queue stalls
 
 **Fix**:
+
 ```typescript
 // BAD - Forgets to send result
 export default class SilentJob extends BaseJob {
@@ -226,6 +244,7 @@ export default class ResponsiveJob extends BaseJob {
 **Symptoms**: Jobs timeout, workers marked as processing but not receiving messages
 
 **Fix**:
+
 ```typescript
 // BAD - Doesn't check worker state
 class NaiveOrchestrator extends SimpleOrchestrator {
@@ -271,6 +290,7 @@ class SmartOrchestrator extends SimpleOrchestrator {
 **Symptoms**: Worker processes partial data, state corrupted, next job fails
 
 **Fix**:
+
 ```typescript
 // BAD - Ignores timeout
 export default class TimeoutJob extends BaseJob {
@@ -333,6 +353,7 @@ export default class CleanTimeoutJob extends BaseJob {
 **Symptoms**: Workers disconnected unnecessarily, jobs fail with "worker offline"
 
 **Fix**:
+
 ```typescript
 // BAD - No heartbeat mechanism
 // Worker gets marked offline after 60 seconds of inactivity
@@ -373,9 +394,12 @@ class HeartbeatWorker extends SimpleWorker {
 **Symptoms**: Messages not received, workers don't connect, errors
 
 **Fix**:
+
 ```typescript
 // BAD - v1.x postMessage
-const worker = new Worker("./worker.js", { /* config */ });
+const worker = new Worker("./worker.js", {
+  /* config */
+});
 
 // GOOD - v2.x WebSocket
 const worker = new SimpleWorker({
@@ -392,6 +416,7 @@ const worker = new SimpleWorker({
 **Symptoms**: Message send failures, data corruption
 
 **Fix**:
+
 ```typescript
 // BAD - Sending complex object directly
 this.wsClient.send({
@@ -419,6 +444,7 @@ this.wsClient.send(JSON.stringify(message));
 **Symptoms**: Memory usage grows, connection drops, delayed processing
 
 **Fix**:
+
 ```typescript
 // BAD - No flow control
 for (let i = 0; i < 1000; i++) {

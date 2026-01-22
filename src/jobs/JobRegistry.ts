@@ -1,6 +1,6 @@
-import { readdir, stat } from 'node:fs/promises';
-import { resolve, join, extname } from 'node:path';
-import { JobLoader } from './JobLoader.js';
+import { readdir, stat } from "node:fs/promises";
+import { resolve, join, extname } from "node:path";
+import { JobLoader } from "./JobLoader.js";
 
 /**
  * Information about a discovered job
@@ -29,7 +29,7 @@ export class JobRegistry {
   /**
    * Discovers all job files in a directory recursively
    */
-  async discoverJobs(directory: string = 'examples'): Promise<JobInfo[]> {
+  async discoverJobs(directory: string = "examples"): Promise<JobInfo[]> {
     const jobsDir = resolve(this.projectRoot, directory);
     const jobs: JobInfo[] = [];
 
@@ -47,7 +47,7 @@ export class JobRegistry {
       }
     }
 
-    return jobs.filter(job => job.isValid);
+    return jobs.filter((job) => job.isValid);
   }
 
   /**
@@ -55,7 +55,7 @@ export class JobRegistry {
    */
   async getJobInfo(jobPath: string): Promise<JobInfo | null> {
     const fullPath = resolve(this.projectRoot, jobPath);
-    
+
     if (this.jobCache.has(fullPath)) {
       return this.jobCache.get(fullPath)!;
     }
@@ -64,7 +64,7 @@ export class JobRegistry {
       name: this.extractJobName(jobPath),
       path: fullPath,
       relativePath: jobPath,
-      isValid: false
+      isValid: false,
     };
 
     await this.validateJob(jobInfo);
@@ -77,7 +77,7 @@ export class JobRegistry {
    * Lists all cached job information
    */
   listJobs(): JobInfo[] {
-    return Array.from(this.jobCache.values()).filter(job => job.isValid);
+    return Array.from(this.jobCache.values()).filter((job) => job.isValid);
   }
 
   /**
@@ -102,9 +102,9 @@ export class JobRegistry {
    * Scans a directory recursively for job files
    */
   private async scanDirectory(
-    directory: string, 
-    jobs: JobInfo[], 
-    relativePath: string
+    directory: string,
+    jobs: JobInfo[],
+    relativePath: string,
   ): Promise<void> {
     try {
       const entries = await readdir(directory);
@@ -122,7 +122,7 @@ export class JobRegistry {
             name: this.extractJobName(entry),
             path: fullPath,
             relativePath: entryRelativePath,
-            isValid: false
+            isValid: false,
           });
         }
       }
@@ -136,19 +136,21 @@ export class JobRegistry {
    */
   private isJobFile(filename: string): boolean {
     const ext = extname(filename);
-    return ['.js', '.ts', '.mjs'].includes(ext) && 
-           !filename.endsWith('.test.js') && 
-           !filename.endsWith('.test.ts') &&
-           !filename.endsWith('.spec.js') && 
-           !filename.endsWith('.spec.ts');
+    return (
+      [".js", ".ts", ".mjs"].includes(ext) &&
+      !filename.endsWith(".test.js") &&
+      !filename.endsWith(".test.ts") &&
+      !filename.endsWith(".spec.js") &&
+      !filename.endsWith(".spec.ts")
+    );
   }
 
   /**
    * Extracts job name from file path
    */
   private extractJobName(filePath: string): string {
-    const filename = filePath.split('/').pop() || filePath;
-    return filename.replace(/\.(js|ts|mjs)$/, '');
+    const filename = filePath.split("/").pop() || filePath;
+    return filename.replace(/\.(js|ts|mjs)$/, "");
   }
 
   /**

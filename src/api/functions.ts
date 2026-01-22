@@ -51,9 +51,7 @@ export async function initializeTaskManager(
  * console.log('Job completed:', result);
  * ```
  */
-export async function scheduleAndWait(
-  jobPayload: JobPayload,
-): Promise<JobResult> {
+export async function scheduleAndWait(jobPayload: JobPayload): Promise<JobResult> {
   return await taskManager.scheduleAndWait(jobPayload);
 }
 
@@ -247,9 +245,7 @@ export async function getOrCreateTaskManager(
  * @param name - Name of the instance to retrieve
  * @returns TaskManager instance or undefined if not found
  */
-export function getTaskManagerInstance(
-  name: string = "default",
-): TaskManager | undefined {
+export function getTaskManagerInstance(name: string = "default"): TaskManager | undefined {
   return defaultFactory.get(name);
 }
 
@@ -259,9 +255,7 @@ export function getTaskManagerInstance(
  * @param name - Name of the instance to destroy
  * @returns Promise that resolves to true if destroyed, false if not found
  */
-export async function destroyTaskManager(
-  name: string = "default",
-): Promise<boolean> {
+export async function destroyTaskManager(name: string = "default"): Promise<boolean> {
   return await defaultFactory.destroy(name);
 }
 
@@ -303,10 +297,7 @@ export async function scheduleAndWaitWith(
  * @param jobPayload - The job configuration
  * @returns Promise that resolves with the job ID
  */
-export async function scheduleWith(
-  manager: TaskManager,
-  jobPayload: JobPayload,
-): Promise<string> {
+export async function scheduleWith(manager: TaskManager, jobPayload: JobPayload): Promise<string> {
   return await manager.schedule(jobPayload);
 }
 
@@ -316,10 +307,7 @@ export async function scheduleWith(
  * @param manager - The TaskManager instance to use
  * @param callback - Function to call when queue is free
  */
-export function whenFreeWith(
-  manager: TaskManager,
-  callback: WhenFreeCallback,
-): void {
+export function whenFreeWith(manager: TaskManager, callback: WhenFreeCallback): void {
   manager.whenFree(callback);
 }
 
@@ -354,10 +342,7 @@ export async function isIdleWith(manager: TaskManager): Promise<boolean> {
  * @param timeoutMs - Maximum time to wait in milliseconds
  * @returns Promise that resolves when idle or rejects on timeout
  */
-export async function whenIdleWith(
-  manager: TaskManager,
-  timeoutMs?: number,
-): Promise<void> {
+export async function whenIdleWith(manager: TaskManager, timeoutMs?: number): Promise<void> {
   return await manager.whenIdle(timeoutMs);
 }
 
@@ -398,10 +383,7 @@ export async function getWorkerStatsWith(manager: TaskManager): Promise<any> {
  * @param status - Job status to filter by
  * @returns Array of jobs with the specified status
  */
-export async function getJobsByStatusWith(
-  manager: TaskManager,
-  status: string,
-): Promise<any[]> {
+export async function getJobsByStatusWith(manager: TaskManager, status: string): Promise<any[]> {
   return await manager.getJobsByStatus(status);
 }
 
@@ -471,9 +453,7 @@ export function hasTaskManager(name: string): boolean {
  * @param timeoutMs - Maximum time to wait in milliseconds
  * @returns Promise that resolves when all are idle or rejects on timeout
  */
-export async function waitForAllTaskManagers(
-  timeoutMs?: number,
-): Promise<void> {
+export async function waitForAllTaskManagers(timeoutMs?: number): Promise<void> {
   return await defaultFactory.waitForAllIdle(timeoutMs);
 }
 

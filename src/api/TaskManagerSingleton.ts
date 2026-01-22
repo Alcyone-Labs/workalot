@@ -1,5 +1,5 @@
-import { TaskManager } from './TaskManager.js';
-import { JobPayload, JobResult, QueueConfig, WhenFreeCallback } from '../types/index.js';
+import { TaskManager } from "./TaskManager.js";
+import { JobPayload, JobResult, QueueConfig, WhenFreeCallback } from "../types/index.js";
 
 /**
  * Singleton wrapper for TaskManager providing a global interface
@@ -38,7 +38,7 @@ class TaskManagerSingleton {
    */
   private async doInitialize(config: QueueConfig, projectRoot?: string): Promise<void> {
     if (this.taskManager) {
-      console.warn('TaskManager already initialized');
+      console.warn("TaskManager already initialized");
       return;
     }
 
@@ -53,8 +53,6 @@ class TaskManagerSingleton {
     this.ensureInitialized();
     return await this.taskManager!.scheduleAndWait(jobPayload);
   }
-
-
 
   /**
    * Register a callback to be called when the queue becomes free
@@ -79,8 +77,6 @@ class TaskManagerSingleton {
     this.ensureInitialized();
     return await this.taskManager!.schedule(jobPayload);
   }
-
-
 
   /**
    * Get the current status
@@ -170,7 +166,7 @@ class TaskManagerSingleton {
    */
   private ensureInitialized(): void {
     if (!this.taskManager) {
-      throw new Error('TaskManager must be initialized before use. Call initialize() first.');
+      throw new Error("TaskManager must be initialized before use. Call initialize() first.");
     }
   }
 }

@@ -41,7 +41,7 @@ async function quickStartExample() {
       taskManager.scheduleAndWait({
         jobFile: "examples/_jobs/PingJob.ts",
         jobPayload: { message: `Job ${i}` },
-      })
+      }),
     );
   }
 
@@ -49,9 +49,7 @@ async function quickStartExample() {
   const totalTime = Date.now() - startTime;
 
   console.log(`Processed ${results.length} jobs in ${totalTime}ms`);
-  console.log(
-    `Average: ${(totalTime / results.length).toFixed(2)}ms per job\n`
-  );
+  console.log(`Average: ${(totalTime / results.length).toFixed(2)}ms per job\n`);
 
   // Example 3: Fire-and-forget job scheduling
   console.log("Example 3: Fire-and-forget scheduling");
@@ -76,12 +74,8 @@ async function quickStartExample() {
   const status = await taskManager.getStatus();
 
   console.log("System Status:");
-  console.log(
-    `- Queue: ${status.queue.total} total, ${status.queue.completed} completed`
-  );
-  console.log(
-    `- Workers: ${status.workers.total} total, ${status.workers.available} available\n`
-  );
+  console.log(`- Queue: ${status.queue.total} total, ${status.queue.completed} completed`);
+  console.log(`- Workers: ${status.workers.total} total, ${status.workers.available} available\n`);
 
   // Graceful shutdown
   await taskManager.shutdown();
@@ -89,12 +83,8 @@ async function quickStartExample() {
 
   console.log("\n✓ Quick start example completed!");
   console.log("\nNext steps:");
-  console.log(
-    "  - Try examples/storage-adapters/redis-example.ts for Redis backend"
-  );
-  console.log(
-    "  - Try examples/storage-adapters/sqlite-backend.ts for SQLite backend"
-  );
+  console.log("  - Try examples/storage-adapters/redis-example.ts for Redis backend");
+  console.log("  - Try examples/storage-adapters/sqlite-backend.ts for SQLite backend");
   console.log("  - Read the README.md for comprehensive API documentation");
 }
 

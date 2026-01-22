@@ -114,9 +114,7 @@ interface StructuredRouteConfig {
 
 server.registerStructuredRoute(
   // Filter: Only match specific messages
-  (message) =>
-    message.type === WorkerMessageType.JOB_RESULT &&
-    message.payload?.success === false,
+  (message) => message.type === WorkerMessageType.JOB_RESULT && message.payload?.success === false,
 
   // Handler: Process matched messages
   (connection, message) => {
@@ -202,12 +200,12 @@ client.on("job-completed", (result) => {});
 ### Event Types
 
 ```typescript
-"job-scheduled" // Job added to queue
-"job-started" // Job claimed by worker
-"job-completed" // Job finished (success or failure)
-"worker-connected" // New worker connected
-"worker-disconnected" // Worker disconnected
-"worker-ready" // Worker ready for jobs
+"job-scheduled"; // Job added to queue
+"job-started"; // Job claimed by worker
+"job-completed"; // Job finished (success or failure)
+"worker-connected"; // New worker connected
+"worker-disconnected"; // Worker disconnected
+"worker-ready"; // Worker ready for jobs
 ```
 
 ### Event Listener Registration
@@ -227,10 +225,10 @@ orchestrator.on("worker-connected", (workerId) => {
 ### Event Types
 
 ```typescript
-"job-received" // Job received from orchestrator
-"job-started" // Job execution started
-"job-completed" // Job execution finished
-"error" // Error occurred
+"job-received"; // Job received from orchestrator
+"job-started"; // Job execution started
+"job-completed"; // Job execution finished
+"error"; // Error occurred
 ```
 
 ### Event Listener Registration

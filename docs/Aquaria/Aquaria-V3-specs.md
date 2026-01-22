@@ -1,7 +1,5 @@
 ---
-
 - Tags: #prd | #aquaria
-
 ---
 
 # Context
@@ -188,12 +186,11 @@ interface WorkflowDefinition {
 
 Distributed job scheduling and WebSocket pub/sub from earlier designs can act as transport and control surfaces. The V3 orchestrator sits above them, consuming and emitting events with the same `_meta` envelope and control commands.
 
-
 # History and Learnings
 
 The first two versions of Aquaria were quite successful in building a layer that fit its original vision, but they both suffered from relatively similar issues:
 
-- They tried to build too much *into* the framework itself so you had state management with many different backends, LLM management, prompt management, Search Providers management, a Provider Capability management, etc… We still need these but we can simply standardize tools and MCP extensions to greatly improve managing that code, reusing existing libraries (there are lots of available MCP servers) and simplifying the code
+- They tried to build too much _into_ the framework itself so you had state management with many different backends, LLM management, prompt management, Search Providers management, a Provider Capability management, etc… We still need these but we can simply standardize tools and MCP extensions to greatly improve managing that code, reusing existing libraries (there are lots of available MCP servers) and simplifying the code
 - They were both too heavy-handed in encapsulation, it became both very hard to compose, debug and optimize, and very easy to break
 - They were way too taylored to each specific payload, so you had a step definition for every little thing
 - Initially, I had written a code to handle talking to Language Models via APIs similar to Vercel AI SDK, but it’s no longer important or needed, so we can ditch all that code and gain new features and support
@@ -203,7 +200,7 @@ The first two versions of Aquaria were quite successful in building a layer that
 - The first two versions tried to “run as” the workflow itself, but that prevents a great many powerful composition patterns, starting with the ability to parallelize or distribute the execution
 - Instead, we should use an orchestration pattern whereby each step belongs to a tree of execution (referred to as a Workflow)
 
-Overall, they were good pieces of software, but they were not future-proof ones, and writing and running workflows felt like *way* too much grunt work. It was also extremely hard to maintain and improve.
+Overall, they were good pieces of software, but they were not future-proof ones, and writing and running workflows felt like _way_ too much grunt work. It was also extremely hard to maintain and improve.
 
 What we need to build is a distillation of all the learnings we gained from it, leverage existing libraries such as Vercel AI SDK for managing models, leveraging on existing tools and MCP servers to extend functionality without having to rewrite things over and over again, and make the execution much more powerful by adding a strong oversight, traceability, statistics, interruptibility, all while making the code a lot simpler and the architecture a lot more robust.
 
@@ -320,10 +317,10 @@ All WebSocket messages follow this standardized structure:
 
 ```json
 {
-  "type": "string",          // Main channel type: "jobs", "workflows", or "service"
-  "subChannel": "string?",   // Optional sub-channel (e.g., "jobs:123", "workflows:456"). If omitted, applies to the main type.
-  "action": "string",        // Specific command or event (e.g., "start", "step:complete")
-  "payload": "object?"       // Optional data object (e.g., inputs, outputs, _meta). Must be JSON-serializable.
+  "type": "string", // Main channel type: "jobs", "workflows", or "service"
+  "subChannel": "string?", // Optional sub-channel (e.g., "jobs:123", "workflows:456"). If omitted, applies to the main type.
+  "action": "string", // Specific command or event (e.g., "start", "step:complete")
+  "payload": "object?" // Optional data object (e.g., inputs, outputs, _meta). Must be JSON-serializable.
 }
 ```
 
@@ -343,33 +340,25 @@ Handles job-level distribution, control, and status from Layer 1 (Distributed Jo
 - **Purpose**: Relay jobs from the scheduler, manage job lifecycle (start, pause, etc.), and report status for requeueing.
 
 - **Sub-Channels**:
-
   - `jobs:${jobId}`: Scoped to a specific job (e.g., `jobs:abc-123`). Ensures only the assigned node processes it.
 
 - **Actions**:
-
   - `start`: Initiates a job. Payload includes workflow details for forwarding to `workflows`.
-
     - Payload: `{ workflowId: "string", entrypoint: "object", parameters: "object" }`
 
   - `stop`: Halts a job. Payload specifies reason.
-
     - Payload: `{ reason: "string?" }`
 
   - `pause`: Suspends a job. Orchestrator saves state.
-
     - Payload: `{ reason: "string?" }`
 
   - `resume`: Resumes a paused job. Orchestrator restores state.
-
     - Payload: `{ }`
 
   - `status`: Updates or queries job state (e.g., running, failed). Used for Layer 1 feedback.
-
     - Payload: `{ state: "string", _meta: "object?" }` (e.g., `{ state: "failed", _meta: { error: "budget exceeded" } }`)
 
 - **Examples**:
-
   - Subscribe to a job: `{ "type": "jobs", "subChannel": "jobs:abc-123", "action": "subscribe" }`
   - Start a job: `{ "type": "jobs", "subChannel": "jobs:abc-123", "action": "start", "payload": { "workflowId": "wf-456", "entrypoint": { "step": "init" } } }`
   - Report status: `{ "type": "jobs", "subChannel": "jobs:abc-123", "action": "status", "payload": { "state": "completed", "_meta": { "runTime": 500 } } }`
@@ -381,47 +370,36 @@ Core orchestration channel for workflow execution, steps, sub-workflows, and too
 - **Purpose**: Manage workflow lifecycle, step execution, parallelization, and control. Enables composable workflows via events.
 
 - **Sub-Channels**:
-
   - `workflows:${workflowId}`: Scoped to a specific workflow (e.g., `workflows:wf-456`). Allows targeted control and event listening.
 
 - **Actions**:
-
   - `start`: Launches a workflow. Orchestrator enqueues steps and sets parameters (e.g., budget).
-
     - Payload: `{ entrypoint: "object", parameters: "object", parallelization: "object?" }` (e.g., `{ entrypoint: { stepId: "init" }, parameters: { budget: 1000 } }`)
 
   - `step:execute`: Signals step start. Includes inputs and context.
-
     - Payload: `{ stepId: "string", inputs: "object", _meta: "object" }`
 
   - `step:complete`: Reports step success. Orchestrator checks exit conditions and triggers next steps.
-
     - Payload: `{ stepId: "string", outputs: "object", _meta: "object" }` (e.g., `{ stepId: "fetch-data", outputs: { data: "..." }, _meta: { runTime: 200, statusCode: 200, budgetConsumed: 50 } }`)
 
   - `step:fail`: Reports step failure. Includes debugging details.
-
     - Payload: `{ stepId: "string", failureDetails: "string", _meta: "object" }` (e.g., `{ stepId: "api-call", failureDetails: "Timeout", _meta: { statusCode: 500, runTime: 1000 } }`)
 
   - `tool:used`: Emitted when a tool or MCP is invoked. Uniform signature for first-class tools.
-
     - Payload: `{ toolId: "string", activity: "string", inputs: "object", outputs: "object", _meta: "object" }` (e.g., `{ toolId: "web-search", activity: "search", inputs: { query: "AI" }, outputs: { results: [...] }, _meta: { runTime: 150, statusCode: 200 } }`)
 
   - `exit`: Triggers exit path due to conditions (e.g., budget overrun). Orchestrator routes to exit steps.
-
     - Payload: `{ reason: "string", _meta: "object" }` (e.g., `{ reason: "budget", _meta: { consumed: 1200 } }`)
 
   - `parallel:start`: Initiates concurrent steps. Orchestrator manages parallelism.
-
     - Payload: `{ steps: "array" }` (e.g., `{ steps: [{ stepId: "step-1" }, { stepId: "step-2" }] }`)
 
   - `stop`, `pause`, `resume`: Workflow-level control. Applies to all active steps.
-
     - Payload: `{ reason: "string?" }`
 
 - **Mesh Extensions** (for future multi-node): Use `workflows:mesh:${nodeId}` for cross-node actions like `balance` (redistribute workflows).
 
 - **Examples**:
-
   - Subscribe to a workflow: `{ "type": "workflows", "subChannel": "workflows:wf-456", "action": "subscribe" }`
   - Start workflow: `{ "type": "workflows", "subChannel": "workflows:wf-456", "action": "start", "payload": { "entrypoint": { "stepId": "init" }, "parameters": { "model": "gpt-4" } } }`
   - Step completion: `{ "type": "workflows", "subChannel": "workflows:wf-456", "action": "step:complete", "payload": { "stepId": "data-process", "outputs": { "result": "processed" }, "_meta": { "runTime": 300, "budgetConsumed": 75, "statusCode": 200 } } }`
@@ -434,32 +412,25 @@ System-level channel for configuration, health checks, and lifecycle management.
 - **Purpose**: Handle node-level settings and operations, enabling mesh connectivity.
 
 - **Sub-Channels**:
-
   - `service:settings`: For configuration updates.
   - `service:health`: For status checks.
 
 - **Actions**:
-
   - `settings:set`: Updates system settings (e.g., global budget defaults).
-
     - Payload: `{ key: "string", value: "any" }` (e.g., `{ key: "maxBudget", value: 2000 }`)
 
   - `shutdown`: Gracefully stops the node.
-
     - Payload: `{ reason: "string?" }`
 
   - `restart`: Restarts the node/service.
-
     - Payload: `{ }`
 
   - `health:check`: Ping for node status. Used for mesh monitoring.
-
     - Payload: `{ }` (Response via separate message or direct reply).
 
 - **Mesh Extensions**: Use `service:mesh:connect` for inter-node links (e.g., `{ "type": "service", "subChannel": "service:mesh", "action": "connect", "payload": { "targetNode": "node-2" } }`).
 
 - **Examples**:
-
   - Set settings: `{ "type": "service", "subChannel": "service:settings", "action": "set", "payload": { "key": "timeout", "value": 30 } }`
   - Shutdown: `{ "type": "service", "action": "shutdown", "payload": { "reason": "maintenance" } }`
   - Health check: `{ "type": "service", "subChannel": "service:health", "action": "check" }`

@@ -71,7 +71,7 @@ interface QueueConfig {
 - `healthCheckInterval`: 5000ms
 - `silent`: false
 - `jobRecoveryEnabled`: true
-- `maxInMemoryAge`: 24 * 60 * 60 * 1000 (24 hours)
+- `maxInMemoryAge`: 24 _ 60 _ 60 \* 1000 (24 hours)
 
 ## Environment Variables
 
@@ -142,13 +142,13 @@ new SimpleWorker({
   wsUrl: "ws://localhost:8080/worker",
   projectRoot: process.cwd(),
   defaultTimeout: 30000, // 30 second default
-})
+});
 
 // WorkerManager config (local threads)
 new WorkerManager(orchestrator, {
   numWorkers: 4,
   projectRoot: process.cwd(),
-})
+});
 ```
 
 ## Orchestrator Configuration
@@ -164,5 +164,5 @@ new SimpleOrchestrator({
     databaseUrl: "./orchestrator.db",
     jobRecoveryEnabled: true,
   },
-})
+});
 ```

@@ -39,11 +39,11 @@ class JobProcessor {
   }
 
   async processBatch(jobs: Array<{ file: string; payload: any }>) {
-    const promises = jobs.map(job =>
+    const promises = jobs.map((job) =>
       scheduleAndWaitWith(this.manager, {
         jobFile: job.file,
         jobPayload: job.payload,
-      })
+      }),
     );
     return Promise.all(promises);
   }
@@ -90,10 +90,7 @@ async function routeJob(job: JobRequest) {
 }
 
 // Cleanup both
-await Promise.all([
-  destroyTaskManager("priority"),
-  destroyTaskManager("background"),
-]);
+await Promise.all([destroyTaskManager("priority"), destroyTaskManager("background")]);
 ```
 
 ## Progressive Complexity Pattern
@@ -108,7 +105,9 @@ const result = await scheduleAndWait({ jobFile: "jobs/Job.ts", jobPayload: {} })
 // Level 2: Add factory
 import { createTaskManager, scheduleAndWaitWith } from "#/index.js";
 const manager = await createTaskManager("main", { backend: "memory" });
-const result = await scheduleAndWaitWith(manager, { /* job */ });
+const result = await scheduleAndWaitWith(manager, {
+  /* job */
+});
 
 // Level 3: Add persistence
 const manager = await createTaskManager("main", {
@@ -129,7 +128,9 @@ await orchestrator.start();
 server.registerChannelRoute({
   type: "workflow",
   subChannel: "step-complete",
-  handler: (connection, message) => { /* handle */ },
+  handler: (connection, message) => {
+    /* handle */
+  },
 });
 ```
 

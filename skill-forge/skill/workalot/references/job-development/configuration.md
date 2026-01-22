@@ -83,7 +83,9 @@ const step1 = await scheduleAndWaitWith(manager, {
   jobPayload: {
     workflowId: "wf-123",
     stepName: "extract",
-    data: { /* ... */ },
+    data: {
+      /* ... */
+    },
   },
 });
 
@@ -96,7 +98,9 @@ const step2 = await scheduleAndWaitWith(manager, {
   jobPayload: {
     metaEnvelope, // Pass accumulated context
     stepName: "transform",
-    data: { /* ... */ },
+    data: {
+      /* ... */
+    },
   },
 });
 ```
@@ -141,16 +145,13 @@ export default class ErrorReportingJob extends BaseJob implements IJob {
       });
     } catch (error) {
       // Return comprehensive error information
-      return this.error(
-        `Operation failed: ${error}`,
-        {
-          payload,
-          operation: this.constructor.name,
-          timestamp: new Date().toISOString(),
-          stack: error instanceof Error ? error.stack : undefined,
-          cause: error instanceof Error ? error.cause : undefined,
-        }
-      );
+      return this.error(`Operation failed: ${error}`, {
+        payload,
+        operation: this.constructor.name,
+        timestamp: new Date().toISOString(),
+        stack: error instanceof Error ? error.stack : undefined,
+        cause: error instanceof Error ? error.cause : undefined,
+      });
     }
   }
 }
@@ -194,7 +195,7 @@ export default class ProgressJob extends BaseJob implements IJob {
     for (let i = 0; i < total; i++) {
       await this.processItem(i);
       // Simulate work
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
     }
   }
 

@@ -108,7 +108,7 @@ export class WorkerLocalQueue extends EventEmitter {
     // Move from processing to completed
     processingJob.result = result;
     processingJob.completedAt = Date.now();
-    
+
     this.completedJobs.set(jobId, processingJob);
     this.processingJobs.delete(jobId);
 
@@ -133,7 +133,7 @@ export class WorkerLocalQueue extends EventEmitter {
     // Move from processing to completed with error
     processingJob.error = error;
     processingJob.completedAt = Date.now();
-    
+
     this.completedJobs.set(jobId, processingJob);
     this.processingJobs.delete(jobId);
 
@@ -180,7 +180,7 @@ export class WorkerLocalQueue extends EventEmitter {
   getStats(): QueueStats {
     const totalCapacity = this.config.maxQueueSize;
     const currentUsage = this.pendingJobs.length + this.processingJobs.size;
-    
+
     return {
       pendingJobs: this.pendingJobs.length,
       processingJobs: this.processingJobs.size,

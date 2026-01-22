@@ -1,6 +1,6 @@
-import { EventEmitter } from 'node:events';
-import { cpus } from 'node:os';
-import { QueueItem, JobStatus, JobPayload, JobResult, QueueConfig } from '../types/index.js';
+import { EventEmitter } from "node:events";
+import { cpus } from "node:os";
+import { QueueItem, JobStatus, JobPayload, JobResult, QueueConfig } from "../types/index.js";
 
 /**
  * Queue statistics interface
@@ -26,16 +26,16 @@ export abstract class IQueueBackend extends EventEmitter {
     this.config = {
       maxInMemoryAge: config.maxInMemoryAge || 24 * 60 * 60 * 1000,
       maxThreads: config.maxThreads || Math.max(1, cpus().length - 2),
-      persistenceFile: config.persistenceFile || 'queue-state.json',
+      persistenceFile: config.persistenceFile || "queue-state.json",
       healthCheckInterval: config.healthCheckInterval || 5000,
-      backend: config.backend || 'memory',
-      databaseUrl: config.databaseUrl || '',
+      backend: config.backend || "memory",
+      databaseUrl: config.databaseUrl || "",
       silent: config.silent || false,
       jobRecoveryEnabled: config.jobRecoveryEnabled !== false, // Default to true
       enableTimescaleDB: config.enableTimescaleDB || false,
-      chunkTimeInterval: config.chunkTimeInterval || '1 hour',
-      compressionInterval: config.compressionInterval || '7 days',
-      retentionInterval: config.retentionInterval || '90 days'
+      chunkTimeInterval: config.chunkTimeInterval || "1 hour",
+      compressionInterval: config.compressionInterval || "7 days",
+      retentionInterval: config.retentionInterval || "90 days",
     };
   }
 
@@ -62,7 +62,7 @@ export abstract class IQueueBackend extends EventEmitter {
     status: JobStatus,
     result?: JobResult,
     error?: Error,
-    workerId?: number
+    workerId?: number,
   ): Promise<boolean>;
 
   /**

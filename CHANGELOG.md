@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 #### New Backend: Redis Queue
+
 - **RedisQueue** implementation with atomic operations via Lua scripts
 - Support for Redis Cluster and distributed deployments
 - Pub/Sub notifications for real-time job updates
@@ -21,12 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Priority queue using Redis Sorted Sets
 
 #### PostgreSQL Improvements
+
 - Migrated from `pg` to `postgres` package for better performance
 - Unified code paths for Bun and Node.js runtimes
 - FOR UPDATE SKIP LOCKED optimization now works on both runtimes
 - Improved connection handling and error recovery
 
 #### Documentation
+
 - Comprehensive Redis Queue documentation (`docs/REDIS_QUEUE.md`)
 - Updated README with Redis backend information
 - Backend comparison table with all 5 backends
@@ -34,12 +37,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated backend selection guide
 
 #### Testing
+
 - Redis test suite (`tests/redis.test.ts`)
 - Automated tests with vitest
 - Manual test scripts for all backends
 - Concurrent job claiming tests
 
 #### Benchmarking
+
 - Redis benchmark configurations
 - Support for 1k and 10k job benchmarks
 - Multi-core scaling tests (2, 4, 6 cores)
@@ -48,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 #### Breaking Changes
+
 - **PostgreSQL**: Replaced `pg` package with `postgres` package
   - Migration: Update imports and connection strings
   - Benefits: Better performance, unified API with Bun
@@ -55,17 +61,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - All backend configurations now support 5 options: `'memory' | 'sqlite' | 'pglite' | 'postgresql' | 'redis'`
 
 #### Improvements
+
 - Cleaner repository structure (moved docs to `docs/` folder)
 - Removed temporary markdown files from root
 - Better .gitignore patterns for test artifacts
 - Improved error messages across all backends
 
 ### Fixed
+
 - PostgreSQL FOR UPDATE SKIP LOCKED now works correctly on Node.js
 - Connection handling improvements in PostgreSQL backend
 - Type safety improvements across all backends
 
 ### Performance
+
 - Redis: 10,000-50,000 jobs/sec (new)
 - PostgreSQL: Improved with `postgres` package
 - SQLite: 10,000-50,000 jobs/sec (verified)
@@ -75,6 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - Previous Release
 
 ### Features
+
 - Memory backend (in-memory queue)
 - SQLite backend (file-based persistence)
 - PGLite backend (WebAssembly PostgreSQL)
@@ -137,6 +147,7 @@ const manager = await createTaskManager("main", {
 ## Roadmap
 
 ### v2.1.0 (Planned)
+
 - [ ] Scheduled jobs (cron-like)
 - [ ] Job dependencies
 - [ ] Dead letter queue
@@ -144,14 +155,15 @@ const manager = await createTaskManager("main", {
 - [ ] Prometheus metrics export
 
 ### v2.2.0 (Planned)
+
 - [ ] Job result streaming
 - [ ] Circuit breaker pattern
 - [ ] Rate limiting
 - [ ] Job priorities (enhanced)
 
 ### Future
+
 - [ ] GraphQL API
 - [ ] Web UI for monitoring
 - [ ] Multi-tenant support
 - [ ] Job versioning
-

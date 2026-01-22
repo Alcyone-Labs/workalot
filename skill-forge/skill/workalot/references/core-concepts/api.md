@@ -7,12 +7,14 @@
 Creates named TaskManager instance for testability and multiple instances.
 
 **Parameters**:
+
 - `name`: Unique instance identifier (used in destroy)
 - `config`: QueueConfig object
 
 **Returns**: Promise<TaskManager> instance
 
 **Example**:
+
 ```typescript
 const manager = await createTaskManager("main", {
   backend: "sqlite",
@@ -26,6 +28,7 @@ const manager = await createTaskManager("main", {
 Shuts down and destroys named TaskManager instance.
 
 **Parameters**:
+
 - `name`: Instance identifier from createTaskManager
 
 ### `scheduleAndWaitWith(manager: TaskManager, jobPayload: JobRequest): Promise<JobResult>`
@@ -33,6 +36,7 @@ Shuts down and destroys named TaskManager instance.
 Schedule job and wait for completion with specific manager instance.
 
 **Parameters**:
+
 - `manager`: TaskManager instance from createTaskManager
 - `jobPayload`: JobRequest object
 
@@ -43,6 +47,7 @@ Schedule job and wait for completion with specific manager instance.
 Schedule job without waiting (fire-and-forget), returns job ID.
 
 **Parameters**:
+
 - `manager`: TaskManager instance
 - `jobPayload`: JobRequest object
 
@@ -53,6 +58,7 @@ Schedule job without waiting (fire-and-forget), returns job ID.
 Register callback when queue becomes empty.
 
 **Parameters**:
+
 - `manager`: TaskManager instance
 - `callback`: Function to execute when queue empty
 

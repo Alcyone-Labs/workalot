@@ -1,11 +1,11 @@
-import { writeFile, mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
-import { BenchmarkResult } from './benchmark-config.js';
+import { writeFile, mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import { BenchmarkResult } from "./benchmark-config.js";
 
 export class ResultsExporter {
   private outputDir: string;
 
-  constructor(outputDir: string = 'benchmarks/results') {
+  constructor(outputDir: string = "benchmarks/results") {
     this.outputDir = outputDir;
   }
 
@@ -25,13 +25,13 @@ export class ResultsExporter {
 
     // Export summary
     const summary = this.createSummary(results);
-    const summaryPath = join(this.outputDir, 'benchmark-summary.json');
+    const summaryPath = join(this.outputDir, "benchmark-summary.json");
     await writeFile(summaryPath, JSON.stringify(summary, null, 2));
     console.log(`📊 Summary exported: ${summaryPath}`);
 
     // Export CSV for easy analysis
     const csvData = this.createCSV(results);
-    const csvPath = join(this.outputDir, 'benchmark-results.csv');
+    const csvPath = join(this.outputDir, "benchmark-results.csv");
     await writeFile(csvPath, csvData);
     console.log(`📈 CSV exported: ${csvPath}`);
   }
@@ -43,7 +43,7 @@ export class ResultsExporter {
     return {
       totalBenchmarks: results.length,
       timestamp: new Date().toISOString(),
-      results: results.map(result => ({
+      results: results.map((result) => ({
         name: result.config.name,
         cores: result.config.cores,
         totalJobs: result.config.totalJobs,
@@ -55,7 +55,7 @@ export class ResultsExporter {
           peakMemory: result.queueingPhase.peakMemory,
           averageCPU: result.queueingPhase.averageCPU,
           averageMemory: result.queueingPhase.averageMemory,
-          workerStats: result.queueingPhase.workerStats
+          workerStats: result.queueingPhase.workerStats,
         },
         execution: {
           duration: result.executionPhase.duration,
@@ -63,9 +63,9 @@ export class ResultsExporter {
           peakMemory: result.executionPhase.peakMemory,
           averageCPU: result.executionPhase.averageCPU,
           averageMemory: result.executionPhase.averageMemory,
-          workerStats: result.executionPhase.workerStats
-        }
-      }))
+          workerStats: result.executionPhase.workerStats,
+        },
+      })),
     };
   }
 
@@ -74,29 +74,33 @@ export class ResultsExporter {
    */
   private createCSV(results: BenchmarkResult[]): string {
     const headers = [
-      'name',
-      'cores',
-      'totalJobs',
-      'totalTime',
-      'jobsPerSecond',
-      'queueingDuration',
-      'queueingPeakCPU',
-      'queueingPeakMemory',
-      'queueingAvgCPU',
-      'queueingAvgMemory',
-      'executionDuration',
-      'executionPeakCPU',
-      'executionPeakMemory',
-      'executionAvgCPU',
-      'executionAvgMemory',
-      'workerUtilization',
-      'jobDistribution',
-      'timestamp'
+      "name",
+      "cores",
+      "totalJobs",
+      "totalTime",
+      "jobsPerSecond",
+      "queueingDuration",
+      "queueingPeakCPU",
+      "queueingPeakMemory",
+      "queueingAvgCPU",
+      "queueingAvgMemory",
+      "executionDuration",
+      "executionPeakCPU",
+      "executionPeakMemory",
+      "executionAvgCPU",
+      "executionAvgMemory",
+      "workerUtilization",
+      "jobDistribution",
+      "timestamp",
     ];
 
-    const rows = results.map(result => {
-      const avgUtilization = result.executionPhase.workerStats.reduce((sum, w) => sum + w.utilizationPercentage, 0) / result.executionPhase.workerStats.length;
-      const jobDistribution = result.executionPhase.workerStats.map(w => w.jobsProcessed).join(':');
+    const rows = results.map((result) => {
+      const avgUtilization =
+        result.executionPhase.workerStats.reduce((sum, w) => sum + w.utilizationPercentage, 0) /
+        result.executionPhase.workerStats.length;
+      const jobDistribution = result.executionPhase.workerStats
+        .map((w) => w.jobsProcessed)
+        .join(":");
 
       return [
         result.config.name,
@@ -116,11 +120,11 @@ export class ResultsExporter {
         result.executionPhase.averageMemory,
         avgUtilization.toFixed(2),
         jobDistribution,
-        result.timestamp
+        result.timestamp,
       ];
     });
 
-    return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+    return [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
   }
 
   /**
@@ -128,7 +132,7 @@ export class ResultsExporter {
    */
   async exportVisualizationData(results: BenchmarkResult[]): Promise<void> {
     const vizData = {
-      summary: results.map(result => ({
+      summary: results.map((result) => ({
         name: result.config.name,
         cores: result.config.cores,
         jobs: result.config.totalJobs,
@@ -136,51 +140,53 @@ export class ResultsExporter {
         totalTime: result.totalTime,
         queueingTime: result.queueingPhase.duration,
         executionTime: result.executionPhase.duration,
-        workerUtilization: result.executionPhase.workerStats.reduce((sum, w) => sum + w.utilizationPercentage, 0) / result.executionPhase.workerStats.length
+        workerUtilization:
+          result.executionPhase.workerStats.reduce((sum, w) => sum + w.utilizationPercentage, 0) /
+          result.executionPhase.workerStats.length,
       })),
-      workerStats: results.flatMap(result =>
-        result.executionPhase.workerStats.map(worker => ({
+      workerStats: results.flatMap((result) =>
+        result.executionPhase.workerStats.map((worker) => ({
           benchmark: result.config.name,
           cores: result.config.cores,
           workerId: worker.workerId,
           jobsProcessed: worker.jobsProcessed,
           utilizationPercentage: worker.utilizationPercentage,
-          averageJobTime: worker.averageJobTime
-        }))
+          averageJobTime: worker.averageJobTime,
+        })),
       ),
-      cpuTimeSeries: results.flatMap(result => [
-        ...result.queueingPhase.cpuUsage.map(cpu => ({
+      cpuTimeSeries: results.flatMap((result) => [
+        ...result.queueingPhase.cpuUsage.map((cpu) => ({
           benchmark: result.config.name,
-          phase: 'queueing',
+          phase: "queueing",
           timestamp: cpu.timestamp,
-          usage: cpu.usage
+          usage: cpu.usage,
         })),
-        ...result.executionPhase.cpuUsage.map(cpu => ({
+        ...result.executionPhase.cpuUsage.map((cpu) => ({
           benchmark: result.config.name,
-          phase: 'execution',
+          phase: "execution",
           timestamp: cpu.timestamp,
-          usage: cpu.usage
-        }))
+          usage: cpu.usage,
+        })),
       ]),
-      memoryTimeSeries: results.flatMap(result => [
-        ...result.queueingPhase.memoryUsage.map(mem => ({
+      memoryTimeSeries: results.flatMap((result) => [
+        ...result.queueingPhase.memoryUsage.map((mem) => ({
           benchmark: result.config.name,
-          phase: 'queueing',
+          phase: "queueing",
           timestamp: mem.timestamp,
           rss: mem.rss,
-          heapUsed: mem.heapUsed
+          heapUsed: mem.heapUsed,
         })),
-        ...result.executionPhase.memoryUsage.map(mem => ({
+        ...result.executionPhase.memoryUsage.map((mem) => ({
           benchmark: result.config.name,
-          phase: 'execution',
+          phase: "execution",
           timestamp: mem.timestamp,
           rss: mem.rss,
-          heapUsed: mem.heapUsed
-        }))
-      ])
+          heapUsed: mem.heapUsed,
+        })),
+      ]),
     };
 
-    const vizPath = join(this.outputDir, 'visualization-data.json');
+    const vizPath = join(this.outputDir, "visualization-data.json");
     await writeFile(vizPath, JSON.stringify(vizData, null, 2));
     console.log(`📊 Visualization data exported: ${vizPath}`);
   }

@@ -5,6 +5,7 @@
 Workalot provides both simple singleton API and factory pattern API. Use factory pattern for testability and multiple instances.
 
 **Key Functions**:
+
 - `scheduleAndWait()` / `scheduleAndWaitWith()` - Schedule and wait for completion
 - `schedule()` / `scheduleWith()` - Fire-and-forget job scheduling
 - `createTaskManager()` / `destroyTaskManager()` - Factory pattern for multiple instances
@@ -16,6 +17,7 @@ Workalot provides both simple singleton API and factory pattern API. Use factory
 ### Schedule and Wait (synchronous)
 
 Use when:
+
 - Job result needed immediately
 - Need to handle errors synchronously
 - Simple request-response pattern
@@ -39,6 +41,7 @@ if (result.success) {
 ### Schedule and Forget (asynchronous)
 
 Use when:
+
 - Result not needed immediately
 - Fire-and-forget pattern
 - Background processing
@@ -59,17 +62,14 @@ console.log("Job scheduled:", jobId);
 ### Factory Pattern (recommended)
 
 Use when:
+
 - Multiple TaskManager instances needed
 - Test isolation required
 - Production deployment
 - Managing lifecycles
 
 ```typescript
-import {
-  createTaskManager,
-  scheduleAndWaitWith,
-  destroyTaskManager,
-} from "#/index.js";
+import { createTaskManager, scheduleAndWaitWith, destroyTaskManager } from "#/index.js";
 
 // Create instance
 const manager = await createTaskManager("main", {
@@ -90,6 +90,7 @@ await destroyTaskManager("main");
 ### Queue Monitoring
 
 Use when:
+
 - Need queue visibility
 - Health checks
 - Dashboard metrics
@@ -119,6 +120,7 @@ setInterval(async () => {
 ### Worker Monitoring
 
 Use when:
+
 - Need worker availability
 - Load balancing decisions
 - Scaling triggers
@@ -148,6 +150,7 @@ setInterval(async () => {
 ### Empty Queue Callback
 
 Use when:
+
 - Need to run code after all jobs complete
 - Batch processing end
 - Cleanup on completion
@@ -187,7 +190,7 @@ const prodSQLiteManager = await prodSQLiteFactory.create("main");
 
 // Production PostgreSQL preset (PostgreSQL, pool, LISTEN/NOTIFY)
 const prodPGFactory = TaskManagerFactoryPresets.productionPostgreSQL(
-  "postgresql://user:pass@localhost/db"
+  "postgresql://user:pass@localhost/db",
 );
 const prodPGManager = await prodPGFactory.create("main");
 ```
@@ -220,7 +223,9 @@ const workflowRequest: JobRequest = {
   jobPayload: {
     workflowId: "wf-123",
     stepName: "transform",
-    data: { /* ... */ },
+    data: {
+      /* ... */
+    },
   },
 };
 ```
@@ -233,9 +238,7 @@ const batchRequests = Array.from({ length: 100 }, (_, i) => ({
   jobPayload: { itemId: i },
 }));
 
-const promises = batchRequests.map(req =>
-  scheduleAndWaitWith(manager, req)
-);
+const promises = batchRequests.map((req) => scheduleAndWaitWith(manager, req));
 
 await Promise.all(promises);
 ```
@@ -254,7 +257,9 @@ interface JobResult {
   retryCount: number;
 }
 
-const result: JobResult = await scheduleAndWait({ /* job */ });
+const result: JobResult = await scheduleAndWait({
+  /* job */
+});
 
 if (result.success) {
   console.log("Job completed in", result.executionTime, "ms");
@@ -349,7 +354,7 @@ if (!result.success && result.executionTime >= 30000) {
 ```typescript
 async function executeWithRetry(
   jobRequest: JobRequest,
-  maxRetries: number = 3
+  maxRetries: number = 3,
 ): Promise<JobResult> {
   let lastResult: JobResult | undefined;
 
@@ -364,7 +369,7 @@ async function executeWithRetry(
 
     if (attempt < maxRetries) {
       // Wait before retry
-      await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
     }
   }
 

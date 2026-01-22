@@ -3,6 +3,7 @@ import { TaskManager } from "../src/api/TaskManager.ts";
 import { JobPayload } from "../src/types/index.ts";
 import path from "path";
 import { fileURLToPath } from "url";
+import { getTempTsonFile } from "./test-utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,10 +14,13 @@ describe("Stress Test", () => {
   let taskManager: TaskManager;
 
   beforeAll(async () => {
-    taskManager = new TaskManager({
-      maxThreads: 4,
-      persistenceFile: `stress-test-queue-${Date.now()}.tson`,
-    }, projectRoot);
+    taskManager = new TaskManager(
+      {
+        maxThreads: 4,
+        persistenceFile: getTempTsonFile("stress-test-queue"),
+      },
+      projectRoot,
+    );
     await taskManager.initialize();
   });
 

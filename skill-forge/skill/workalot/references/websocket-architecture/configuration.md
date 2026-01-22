@@ -29,10 +29,10 @@ const prodPort = parseInt(process.env.WS_PORT || "8080");
 
 ```typescript
 // Round-robin: Workers 1, 2, 3, 1, 2, 3...
-distributionStrategy: "round-robin"
+distributionStrategy: "round-robin";
 
 // Random: Workers 3, 1, 2, 3, 2, 1...
-distributionStrategy: "random"
+distributionStrategy: "random";
 ```
 
 ## Worker Configuration
@@ -50,8 +50,8 @@ const worker = new SimpleWorker({
 
 ```typescript
 // Sequential IDs
-const worker1 = new SimpleWorker({ workerId: 1, /* ... */ });
-const worker2 = new SimpleWorker({ workerId: 2, /* ... */ });
+const worker1 = new SimpleWorker({ workerId: 1 /* ... */ });
+const worker2 = new SimpleWorker({ workerId: 2 /* ... */ });
 
 // Or use process ID for containers
 const containerWorkerId = parseInt(process.env.CONTAINER_INDEX || "0");
@@ -61,13 +61,13 @@ const containerWorkerId = parseInt(process.env.CONTAINER_INDEX || "0");
 
 ```typescript
 // Development
-projectRoot: process.cwd()
+projectRoot: process.cwd();
 
 // Production (Docker)
-projectRoot: "/app"
+projectRoot: "/app";
 
 // Production (filesystem)
-projectRoot: "/var/lib/workalot"
+projectRoot: "/var/lib/workalot";
 ```
 
 ## Channel Routing Configuration
@@ -76,7 +76,9 @@ projectRoot: "/var/lib/workalot"
 server.registerChannelRoute({
   // Define channel patterns
   channelPatterns: ["workflow/*", "monitoring/*"],
-  handler: (connection, message) => { /* handler */ },
+  handler: (connection, message) => {
+    /* handler */
+  },
 });
 ```
 
@@ -86,16 +88,16 @@ server.registerChannelRoute({
 
 ```typescript
 // Local development
-wsUrl: "ws://localhost:8080/worker"
+wsUrl: "ws://localhost:8080/worker";
 
 // Production (domain)
-wsUrl: "ws://worker.example.com:8080/worker"
+wsUrl: "ws://worker.example.com:8080/worker";
 
 // Production (load balancer)
-wsUrl: "ws://lb.example.com/worker"
+wsUrl: "ws://lb.example.com/worker";
 
 // Production (SSL/TLS)
-wsUrl: "wss://worker.example.com:8443/worker"
+wsUrl: "wss://worker.example.com:8443/worker";
 ```
 
 ### Connection Timeout

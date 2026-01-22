@@ -13,22 +13,22 @@ import {
   BatchJobContext,
   BatchExecutionResult,
   JobSchedulingRequest,
-  JobSchedulingRequest,
+
   BaseJobExecutionContext,
 } from "../types/index.js";
-import { trace, metrics, SpanStatusCode } from '@opentelemetry/api';
+import { trace, metrics, SpanStatusCode } from "@opentelemetry/api";
 
-const tracer = trace.getTracer('workalot-scheduler');
-const meter = metrics.getMeter('workalot-scheduler');
+const tracer = trace.getTracer("workalot-scheduler");
+const meter = metrics.getMeter("workalot-scheduler");
 
-const queueDurationHistogram = meter.createHistogram('job_queue_duration_ms', {
-  description: 'Time jobs spend in queue before processing',
-  unit: 'ms',
+const queueDurationHistogram = meter.createHistogram("job_queue_duration_ms", {
+  description: "Time jobs spend in queue before processing",
+  unit: "ms",
 });
 
-const jobExecutionHistogram = meter.createHistogram('job_execution_duration_ms', {
-  description: 'Time taken to execute a job',
-  unit: 'ms',
+const jobExecutionHistogram = meter.createHistogram("job_execution_duration_ms", {
+  description: "Time taken to execute a job",
+  unit: "ms",
 });
 
 /**
@@ -58,7 +58,7 @@ export class JobScheduler extends EventEmitter {
   private lastProcessingTime = 0;
   private readonly minProcessingInterval = 1; // Minimum 1ms between processing calls for higher throughput
 
-constructor(
+  constructor(
     private queueBackend: IQueueBackend,
     private config: QueueConfig,
     projectRoot: string = process.cwd(),
@@ -90,7 +90,7 @@ constructor(
 
       this.workerManager = new WorkerManager(queueOrchestrator, workerManagerConfig);
     }
-    
+
     this.jobExecutor = new JobExecutor(projectRoot);
 
     // Initialize JobRecoveryService
@@ -149,8 +149,6 @@ constructor(
     return finalJobId;
   }
 
-
-
   /**
    * Schedule a job and wait for it to complete
    */
@@ -195,8 +193,6 @@ constructor(
     });
   }
 
-
-
   /**
    * Get scheduler statistics
    */
@@ -239,7 +235,9 @@ constructor(
   setBatchConfig(batchSize: number, enabled: boolean = true): void {
     this.batchSize = Math.max(1, Math.min(100, batchSize)); // Clamp between 1-100
     this.useBatchProcessing = enabled;
-    console.log(`Batch processing ${enabled ? 'enabled' : 'disabled'} with batch size: ${this.batchSize}`);
+    console.log(
+      `Batch processing ${enabled ? "enabled" : "disabled"} with batch size: ${this.batchSize}`,
+    );
   }
 
   /**
@@ -251,8 +249,6 @@ constructor(
       enabled: this.useBatchProcessing,
     };
   }
-
-
 
   /**
    * Manually trigger job recovery check
@@ -276,7 +272,7 @@ constructor(
     this.jobRecoveryService.stop();
 
     // Wait a brief moment for any in-flight job status updates to complete
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     await this.workerManager.shutdown();
 
@@ -300,7 +296,7 @@ constructor(
         this.processJobs();
       }, 0);
     });
-    
+
     this.workerManager.on("job-failed", (jobId: string, error: string) => {
       console.log(`[JobScheduler] Received job-failed event for ${jobId} with error: ${error}`);
       this.handleJobFailed(jobId, error);
@@ -320,7 +316,9 @@ constructor(
     });
 
     this.jobRecoveryService.on("jobs-failed", ({ count, jobs }) => {
-      console.log(`Job recovery service marked ${count} jobs as failed after max recovery attempts`);
+      console.log(
+        `Job recovery service marked ${count} jobs as failed after max recovery attempts`,
+      );
     });
 
     this.jobRecoveryService.on("recovery-error", (error) => {
@@ -357,9 +355,12 @@ constructor(
    * Process pending jobs
    */
   private async processJobs(): Promise<void> {
-    return tracer.startActiveSpan('JobScheduler.processJobs', async (span) => {
+    return tracer.startActiveSpan("JobScheduler.processJobs", async (span) => {
       if (this.isProcessing || this.isShuttingDown) {
-        span.addEvent('Skipping processing', { isProcessing: this.isProcessing, isShuttingDown: this.isShuttingDown });
+        span.addEvent("Skipping processing", {
+          isProcessing: this.isProcessing,
+          isShuttingDown: this.isShuttingDown,
+        });
         span.end();
         return;
       }
@@ -367,7 +368,7 @@ constructor(
       // Throttle processing calls to prevent event loop overload
       const now = Date.now();
       if (now - this.lastProcessingTime < this.minProcessingInterval) {
-        span.addEvent('Throttled');
+        span.addEvent("Throttled");
         span.end();
         return;
       }
@@ -438,9 +439,9 @@ constructor(
 
     // Execute jobs directly on workers
     try {
-      const jobPayloads = batchJobs.map(job => job.jobPayload);
-      const jobIds = batchJobs.map(job => job.jobId);
-      
+      const jobPayloads = batchJobs.map((job) => job.jobPayload);
+      const jobIds = batchJobs.map((job) => job.jobId);
+
       await this.workerManager.executeBatchJobs(jobPayloads, jobIds);
 
       // Jobs are already marked as PROCESSING by getNextPendingJobs
@@ -470,7 +471,7 @@ constructor(
 
       try {
         // Start job execution without awaiting (concurrent execution)
-        this.executeJob(nextJob.id, nextJob.jobPayload).catch(error => {
+        this.executeJob(nextJob.id, nextJob.jobPayload).catch((error) => {
           console.error(`Error executing job ${nextJob.id}:`, error);
         });
 
@@ -490,30 +491,27 @@ constructor(
   /**
    * Execute a specific job
    */
-  private async executeJob(
-    jobId: string,
-    jobPayload: JobPayload,
-  ): Promise<void> {
+  private async executeJob(jobId: string, jobPayload: JobPayload): Promise<void> {
     const startTime = Date.now();
-    
+
     // We already have a span from processJobs, but executeJob runs "concurrently" (fire and forget)
     // so we should start a new root span or link it.
-    // However, since it's called from processSingleJobs which is awaited in processJobs, 
+    // However, since it's called from processSingleJobs which is awaited in processJobs,
     // it effectively runs within that scope context *until the promise is created*.
     // Better to start a new span that represents the async execution.
-    
-    return tracer.startActiveSpan('JobScheduler.executeJob', async (span) => {
-      span.setAttribute('job.id', jobId);
-      
+
+    return tracer.startActiveSpan("JobScheduler.executeJob", async (span) => {
+      span.setAttribute("job.id", jobId);
+
       try {
         // Note: Job status is already updated to 'processing' by the queue backend's getNextPendingJob()
         // Each backend handles atomic job claiming differently for optimal performance
 
         // Use current time for queue time calculation (avoid extra DB query)
         // Ideally we would get the requestedAt from the job object, but executeJob signature only has payload
-        // We'll perform an estimation if needed or update signature in future. 
+        // We'll perform an estimation if needed or update signature in future.
         // For now, let's just trace execution.
-        
+
         const queueTime = 0; // Simplified
         const context: BaseJobExecutionContext = {
           jobId,
@@ -528,22 +526,21 @@ constructor(
         try {
           const result = await this.workerManager.executeJob(jobPayload, jobId);
           // This will be handled by the event handler
-          
+
           span.setStatus({ code: SpanStatusCode.OK });
           const duration = Date.now() - startTime;
-          jobExecutionHistogram.record(duration, { status: 'success' });
-          
+          jobExecutionHistogram.record(duration, { status: "success" });
         } catch (workerError) {
           // Handle specific worker errors
           if (workerError instanceof Error && workerError.message === "No available workers") {
-            span.addEvent('Retry: No available workers');
+            span.addEvent("Retry: No available workers");
             // Retry after a short delay if no workers are available
             setTimeout(() => {
-              this.executeJob(jobId, jobPayload).catch(retryError => {
+              this.executeJob(jobId, jobPayload).catch((retryError) => {
                 console.error(`Retry failed for job ${jobId}:`, retryError);
               });
             }, 100); // Retry after 100ms
-            
+
             span.end(); // End this attempt span
             return;
           }
@@ -551,15 +548,12 @@ constructor(
         }
       } catch (error) {
         const duration = Date.now() - startTime;
-        jobExecutionHistogram.record(duration, { status: 'failed' });
-        
+        jobExecutionHistogram.record(duration, { status: "failed" });
+
         span.recordException(error as Error);
         span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error).message });
-        
-        await this.handleJobFailed(
-          jobId,
-          error instanceof Error ? error.message : String(error),
-        );
+
+        await this.handleJobFailed(jobId, error instanceof Error ? error.message : String(error));
       } finally {
         span.end();
       }
@@ -572,8 +566,8 @@ constructor(
   private async executeBatchJobs(batchJobs: BatchJobContext[]): Promise<void> {
     try {
       // Extract job payloads for the worker manager
-      const jobPayloads = batchJobs.map(batchJob => batchJob.jobPayload);
-      
+      const jobPayloads = batchJobs.map((batchJob) => batchJob.jobPayload);
+
       // Execute batch on worker
       const result = await this.workerManager.executeBatchJobs(jobPayloads);
 
@@ -606,19 +600,12 @@ constructor(
   /**
    * Handle job completion
    */
-  private async handleJobCompleted(
-    jobId: string,
-    result: JobResult,
-  ): Promise<void> {
+  private async handleJobCompleted(jobId: string, result: JobResult): Promise<void> {
     console.log(`[JobScheduler] Handling job completion for ${jobId}`);
     try {
       // Skip database operations if shutting down
       if (!this.isShuttingDown) {
-        await this.queueBackend.updateJobStatus(
-          jobId,
-          JobStatus.COMPLETED,
-          result,
-        );
+        await this.queueBackend.updateJobStatus(jobId, JobStatus.COMPLETED, result);
 
         // Process any scheduling requests from the job
         if (result.schedulingRequests && result.schedulingRequests.length > 0) {
@@ -628,7 +615,7 @@ constructor(
 
       this.emit("job-completed", jobId, result);
       console.log(`[JobScheduler] Emitted job-completed event for ${jobId}`);
-      
+
       // Check if scheduler is now idle and emit event if so
       if (await this.isIdle()) {
         this.emit("scheduler-idle");
@@ -644,25 +631,17 @@ constructor(
   /**
    * Handle job failure
    */
-  private async handleJobFailed(
-    jobId: string,
-    errorMessage: string,
-  ): Promise<void> {
+  private async handleJobFailed(jobId: string, errorMessage: string): Promise<void> {
     console.log(`[JobScheduler] Handling job failure for ${jobId} with error: ${errorMessage}`);
     try {
       // Skip database operations if shutting down
       if (!this.isShuttingDown) {
         const error = new Error(errorMessage);
-        await this.queueBackend.updateJobStatus(
-          jobId,
-          JobStatus.FAILED,
-          undefined,
-          error,
-        );
+        await this.queueBackend.updateJobStatus(jobId, JobStatus.FAILED, undefined, error);
       }
       this.emit("job-failed", jobId, errorMessage);
       console.log(`[JobScheduler] Emitted job-failed event for ${jobId}`);
-      
+
       // Check if scheduler is now idle and emit event if so
       if (await this.isIdle()) {
         this.emit("scheduler-idle");
@@ -681,7 +660,7 @@ constructor(
   private async processSchedulingRequests(requests: JobSchedulingRequest[]): Promise<void> {
     for (const request of requests) {
       try {
-        if (request.type === 'schedule' || request.type === 'scheduleAndWait') {
+        if (request.type === "schedule" || request.type === "scheduleAndWait") {
           // Both types are fire-and-forget scheduling since the original job has already completed
           // The requestId could be used for tracking if needed
           await this.schedule(request.jobPayload);
