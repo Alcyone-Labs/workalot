@@ -1,430 +1,433 @@
-# Migration Guide: postMessage to WebSocket
+# Migration Guide
 
-## Overview
+This guide covers migrating from Workalot v1.x to v2.x.
 
-Starting with version 2.0.0, Workalot is transitioning from Node.js Worker threads with `postMessage` communication to a WebSocket-based architecture. This change brings better scalability, consistency, and feature parity across all components.
+## Breaking Changes
 
-## Why the Change?
+### API Changes
 
-The postMessage-based system had several limitations:
+| v1.x                   | v2.x                 | Notes                   |
+| ---------------------- | -------------------- | ----------------------- |
+| `TaskManagerSingleton` | `TaskManagerFactory` | New factory pattern     |
+| `scheduleNow()`        | `scheduleAndWait()`  | Renamed for clarity     |
+| Callback-based         | `async/await`        | Modern async patterns   |
+| `postMessage`          | `WebSocket`          | New communication layer |
 
-- **Dual communication systems** created complexity and confusion
-- **Platform-specific** to Node.js Worker threads
-- **Limited scalability** for distributed systems
-- **Inconsistent APIs** between WorkerManager and BaseOrchestrator
-- **Testing complexity** due to Worker thread requirements
+### Constructor Changes
 
-The WebSocket-based approach provides:
+```typescript
+// v1.x
+const manager = TaskManagerSingleton.getInstance({
+  maxWorkers: 4,
+});
 
-- **Unified communication** across all components
-- **Platform flexibility** (works in browsers, Deno, Bun, etc.)
-- **Better scalability** for distributed deployments
-- **Consistent APIs** throughout the codebase
-- **Easier testing** with mock WebSocket connections
+// v2.x
+const factory = new TaskManagerFactory();
+const manager = await factory.create("default", {
+  maxThreads: 4,
+});
+```
 
-## Deprecation Notice
+### Schedule Method Changes
 
-### Deprecated Components
+```typescript
+// v1.x
+manager.scheduleNow(jobFile, payload, callback);
 
-- `WorkerManager` (postMessage-based) - Will be removed in v3.0.0
-- `worker.ts` (Worker thread implementation) - Will be removed in v3.0.0
+// v2.x
+const result = await manager.scheduleAndWait({
+  jobFile: "jobs/MyJob.ts",
+  jobPayload: payload,
+});
 
-### Recommended Replacements
+// Fire-and-forget
+const jobId = await manager.schedule({
+  jobFile: "jobs/MyJob.ts",
+  jobPayload: payload,
+});
+```
 
-- Use `WorkerManagerWS` instead of `WorkerManager`
-- Use `SimpleWorker` or `BaseWorker` with WebSocket communication
-- Use `SimpleOrchestrator` or `BaseOrchestrator` for orchestration
+### Backend Configuration
+
+```typescript
+// v1.x
+const manager = new TaskManager({
+  type: "memory", // or "redis", "postgres"
+  url: "redis://localhost",
+});
+
+// v2.x
+const manager = new TaskManager({
+  backend: "memory", // "memory", "sqlite", "postgresql", "redis", "pglite"
+  databaseUrl: "redis://localhost:6379",
+});
+```
 
 ## Migration Steps
 
-### Step 1: Update WorkerManager Usage
+### 1. Update Dependencies
 
-#### Before (postMessage)
+```bash
+pnpm remove workalot
+pnpm add workalot@^2.0.0
+```
+
+### 2. Update Job Files
+
+v1.x jobs used a different signature:
 
 ```typescript
-import { WorkerManager, QueueOrchestrator } from "workalot";
+// v1.x
+class MyJob {
+  async run(payload, done) {
+    done(null, { result: payload.data });
+  }
+}
+```
 
-const orchestrator = new QueueOrchestrator({
-  backend: "sqlite",
-  databaseUrl: "./queue.db",
+v2.x jobs extend BaseJob:
+
+```typescript
+// v2.x
+import { BaseJob } from "workalot";
+
+export class MyJob extends BaseJob {
+  async run(payload: Record<string, any>): Promise<Record<string, any>> {
+    return this.createSuccessResult({
+      result: payload.data,
+    });
+  }
+}
+```
+
+### 3. Update Application Code
+
+```typescript
+// v1.x
+import { TaskManagerSingleton } from "workalot";
+
+TaskManagerSingleton.initialize({ maxWorkers: 4 });
+
+TaskManagerSingleton.scheduleNow("jobs/MyJob.ts", { data: "test" }, (err, result) => {
+  console.log(result);
 });
 
-const workerManager = new WorkerManager(orchestrator, {
-  numWorkers: 4,
-  projectRoot: process.cwd(),
-  silent: false,
+TaskManagerSingleton.shutdown();
+```
+
+```typescript
+// v2.x
+import { TaskManager, TaskManagerFactory } from "workalot";
+
+// Option 1: Factory pattern (recommended)
+const factory = new TaskManagerFactory();
+const manager = await factory.create("default", {
+  backend: "memory",
+  maxThreads: 4,
 });
 
-await workerManager.initialize();
+const result = await manager.scheduleAndWait({
+  jobFile: "jobs/MyJob.ts",
+  jobPayload: { data: "test" },
+});
 
-// Execute job
-const result = await workerManager.executeJob({
-  id: "job-1",
-  type: "ProcessData",
-  payload: { data: "test" },
+await factory.destroyAll();
+
+// Option 2: Singleton (still available)
+import { initializeTaskManager, scheduleAndWait, shutdown } from "workalot";
+
+await initializeTaskManager({ backend: "memory" });
+
+const result = await scheduleAndWait({
+  jobFile: "jobs/MyJob.ts",
+  jobPayload: { data: "test" },
+});
+
+await shutdown();
+```
+
+### 4. Update Callback Usage
+
+```typescript
+// v1.x - whenFree with callback
+manager.whenFree(() => {
+  console.log("Queue is empty");
+});
+
+// v2.x - whenFree with callback (same API)
+manager.whenFree(() => {
+  console.log("Queue is empty");
+});
+
+// v2.x - whenIdle with promise
+await manager.whenIdle(30000); // 30 second timeout
+```
+
+### 5. Update Status Methods
+
+```typescript
+// v1.x
+const status = manager.getStatus();
+const workers = manager.getWorkers();
+
+// v2.x
+const status = await manager.getStatus();
+const workers = await manager.getWorkerStats();
+const queueStats = await manager.getQueueStats();
+```
+
+### 6. Update Error Handling
+
+```typescript
+// v1.x
+manager.scheduleNow("job.ts", payload, (err, result) => {
+  if (err) {
+    console.error("Job failed:", err);
+    return;
+  }
+  console.log("Result:", result);
+});
+
+// v2.x
+try {
+  const result = await manager.scheduleAndWait({
+    jobFile: "jobs/MyJob.ts",
+    jobPayload: payload,
+  });
+  console.log("Result:", result.results);
+} catch (error) {
+  console.error("Job failed:", error.message);
+}
+```
+
+## New Features in v2.x
+
+### Factory Pattern
+
+Multiple isolated instances:
+
+```typescript
+const factory = new TaskManagerFactory();
+
+const mainQueue = await factory.create("main", {
+  backend: "postgresql",
+});
+
+const backgroundQueue = await factory.create("background", {
+  backend: "memory",
+});
+
+const priorityQueue = await factory.create("priority", {
+  backend: "redis",
 });
 ```
 
-#### After (WebSocket)
+### WebSocket Communication
+
+Distributed workers use WebSocket:
 
 ```typescript
-import { WorkerManagerWS, QueueOrchestrator } from "workalot";
-
-const orchestrator = new QueueOrchestrator({
-  backend: "sqlite",
-  databaseUrl: "./queue.db",
-});
-
-const workerManager = new WorkerManagerWS(orchestrator, {
-  numWorkers: 4,
-  projectRoot: process.cwd(),
-  silent: false,
+const manager = new TaskManager({
   wsPort: 8080,
-  wsHostname: "localhost",
-});
-
-await workerManager.initialize();
-
-// Execute job - API remains the same!
-const result = await workerManager.executeJob({
-  id: "job-1",
-  type: "ProcessData",
-  payload: { data: "test" },
+  wsHostname: "0.0.0.0",
 });
 ```
 
-### Step 2: Create WebSocket Workers
+### Job Recovery
 
-#### Before (Worker threads)
-
-Workers were automatically created by WorkerManager using Node.js Worker threads.
-
-#### After (WebSocket Workers)
-
-You need to explicitly create worker processes that connect via WebSocket:
+Automatic stalled job recovery:
 
 ```typescript
-// worker-process.ts
-import { SimpleWorker } from "workalot";
-
-const worker = new SimpleWorker({
-  workerId: parseInt(process.env.WORKER_ID || "1"),
-  wsUrl: "ws://localhost:8080/worker",
-  projectRoot: process.cwd(),
-  defaultTimeout: 30000,
-});
-
-// Start the worker
-await worker.start();
-
-// Worker will now:
-// 1. Connect to the orchestrator
-// 2. Execute jobs as they're assigned
-// 3. Report results back
-
-// Keep the process running
-process.on("SIGINT", async () => {
-  await worker.stop();
-  process.exit(0);
+const manager = new TaskManager({
+  jobRecoveryEnabled: true,
+  healthCheckInterval: 30000,
 });
 ```
 
-### Step 3: Simplified Architecture Options
+### Batch Processing
 
-For simpler use cases, consider using the new simplified components:
-
-#### Using SimpleOrchestrator and SimpleWorker
+High-throughput batch jobs:
 
 ```typescript
-// orchestrator.ts
-import { SimpleOrchestrator } from "workalot";
+scheduler.setBatchConfig({
+  batchSize: 100,
+  enabled: true,
+});
+```
 
-const orchestrator = new SimpleOrchestrator({
-  wsPort: 8080,
-  queueConfig: {
-    backend: "sqlite",
-    databaseUrl: "./queue.db",
+### Meta Envelopes
+
+Workflow chaining:
+
+```typescript
+await manager.scheduleAndWait({
+  jobFile: "jobs/Step1.ts",
+  jobPayload: { data: "input" },
+  metaEnvelope: {
+    workflowId: "wf-123",
+    stepNumber: 1,
   },
 });
-
-await orchestrator.start();
-
-// Add jobs
-await orchestrator.addJob({
-  id: "job-1",
-  type: "ProcessData",
-  payload: { data: "test" },
-});
-
-// worker.ts (separate process)
-import { SimpleWorker } from "workalot";
-
-const worker = new SimpleWorker({
-  workerId: 1,
-  wsUrl: "ws://localhost:8080/worker",
-});
-
-await worker.start();
 ```
 
-### Step 4: Update Task Manager Usage
+## Complete Migration Example
 
-If using the high-level TaskManager API, consider switching from singleton to factory pattern:
-
-#### Before (Singleton)
+### Before (v1.x)
 
 ```typescript
-import { taskManager } from "workalot";
+// main.ts
+const TaskManagerSingleton = require("workalot").TaskManagerSingleton;
 
-await taskManager.initialize({
-  backend: "sqlite",
-  databaseUrl: "./queue.db",
+TaskManagerSingleton.initialize({
+  type: "redis",
+  url: process.env.REDIS_URL,
+  maxWorkers: 4,
 });
 
-const result = await taskManager.scheduleAndWait({
-  type: "ProcessData",
-  payload: { data: "test" },
-});
+function processOrder(order) {
+  return new Promise((resolve, reject) => {
+    TaskManagerSingleton.scheduleNow("jobs/ProcessOrder.ts", { order }, (err, result) => {
+      if (err) reject(err);
+      else resolve(result);
+    });
+  });
+}
 
-await taskManager.shutdown();
+function onAllComplete() {
+  console.log("All orders processed");
+  TaskManagerSingleton.shutdown();
+}
+
+// Usage
+processOrder({ id: 1, items: ["a", "b"] })
+  .then(() => processOrder({ id: 2, items: ["c"] }))
+  .then(() => {
+    if (TaskManagerSingleton.isQueueEmpty()) {
+      onAllComplete();
+    } else {
+      TaskManagerSingleton.whenQueueEmpty(onAllComplete);
+    }
+  });
 ```
 
-#### After (Factory - Recommended)
+### After (v2.x)
 
 ```typescript
+// main.ts
 import { TaskManagerFactory } from "workalot";
 
-const factory = new TaskManagerFactory();
-const taskManager = await factory.create("main", {
-  backend: "sqlite",
-  databaseUrl: "./queue.db",
-});
+async function main() {
+  const factory = new TaskManagerFactory();
 
-const result = await taskManager.scheduleAndWait({
-  type: "ProcessData",
-  payload: { data: "test" },
-});
+  const mainQueue = await factory.create("main", {
+    backend: "redis",
+    databaseUrl: process.env.REDIS_URL,
+    maxThreads: 4,
+  });
 
-await factory.destroy("main");
+  async function processOrder(order) {
+    const result = await mainQueue.scheduleAndWait({
+      jobFile: "jobs/ProcessOrder.ts",
+      jobPayload: { order },
+    });
+    return result;
+  }
+
+  // Usage
+  await processOrder({ id: 1, items: ["a", "b"] });
+  await processOrder({ id: 2, items: ["c"] });
+
+  await mainQueue.whenIdle();
+  console.log("All orders processed");
+
+  await factory.destroyAll();
+}
+
+main().catch(console.error);
 ```
 
-## Configuration Changes
+## Rollback Plan
 
-### WorkerManager Configuration
-
-#### Old Configuration (postMessage)
+If issues arise, you can temporarily use the compatibility layer:
 
 ```typescript
-interface WorkerManagerConfig {
-  numWorkers?: number;
-  projectRoot?: string;
-  silent?: boolean;
-  healthCheckInterval?: number;
-  jobTimeout?: number;
-  batchTimeout?: number;
+// Add this shim file for gradual migration
+import { TaskManager } from "workalot";
+
+export class LegacyTaskManager {
+  private manager: TaskManager;
+
+  constructor(config: any) {
+    this.manager = new TaskManager({
+      backend: config.type,
+      databaseUrl: config.url,
+      maxThreads: config.maxWorkers,
+    });
+  }
+
+  async initialize() {
+    await this.manager.initialize();
+  }
+
+  scheduleNow(jobFile: string, payload: any, callback: (err: Error | null, result?: any) => void) {
+    this.manager
+      .scheduleAndWait({
+        jobFile,
+        jobPayload: payload,
+      })
+      .then((result) => callback(null, result))
+      .catch((err) => callback(err));
+  }
+
+  getStatus() {
+    return this.manager.getStatus();
+  }
+
+  shutdown() {
+    return this.manager.shutdown();
+  }
 }
 ```
 
-#### New Configuration (WebSocket)
+## Testing Migration
+
+1. **Run existing tests** with v2.x
+2. **Update test expectations** for new API
+3. **Test error handling** with new patterns
+4. **Benchmark performance** to ensure no regression
+5. **Test failure scenarios** with job recovery
+
+## Known Issues
+
+### Path Resolution
+
+Job files are now resolved relative to project root:
 
 ```typescript
-interface WorkerManagerConfig {
-  numWorkers?: number; // Still supported
-  projectRoot?: string; // Still supported
-  silent?: boolean; // Still supported
-  wsPort?: number; // NEW: WebSocket port
-  wsHostname?: string; // NEW: WebSocket hostname
-  enableHealthCheck?: boolean; // NEW: Explicit health check toggle
-  healthCheckInterval?: number; // Still supported
-  jobTimeout?: number; // Still supported
-  batchTimeout?: number; // Still supported
-}
-```
-
-## Deployment Considerations
-
-### Process Management
-
-With WebSocket-based workers, you need to manage worker processes separately:
-
-#### Using PM2
-
-```javascript
-// ecosystem.config.js
-module.exports = {
-  apps: [
-    {
-      name: "orchestrator",
-      script: "./dist/orchestrator.js",
-      instances: 1,
-    },
-    {
-      name: "worker",
-      script: "./dist/worker.js",
-      instances: 4,
-      env: {
-        WORKER_ID: "0", // PM2 will increment this
-      },
-    },
-  ],
-};
-```
-
-#### Using Docker Compose
-
-```yaml
-version: "3.8"
-
-services:
-  orchestrator:
-    build: .
-    command: node dist/orchestrator.js
-    ports:
-      - "8080:8080"
-
-  worker:
-    build: .
-    command: node dist/worker.js
-    environment:
-      - WORKER_ID=${WORKER_ID}
-      - WS_URL=ws://orchestrator:8080/worker
-    deploy:
-      replicas: 4
-```
-
-### Scaling Advantages
-
-The WebSocket approach enables better scaling patterns:
-
-1. **Horizontal Scaling**: Workers can run on different machines
-2. **Dynamic Scaling**: Add/remove workers without restarting orchestrator
-3. **Load Balancing**: Distribute workers across multiple orchestrators
-4. **Cloud Native**: Better suited for Kubernetes and container orchestration
-
-## Testing Changes
-
-### Before (Worker Threads)
-
-```typescript
-// Testing was complex due to Worker thread requirements
-import { Worker } from "worker_threads";
-
-jest.mock("worker_threads", () => ({
-  Worker: jest.fn().mockImplementation(() => ({
-    on: jest.fn(),
-    postMessage: jest.fn(),
-    terminate: jest.fn(),
-  })),
-}));
-```
-
-### After (WebSocket)
-
-```typescript
-// Testing is simpler with WebSocket mocks
-import { WebSocketServer } from "workalot";
-
-// Use in-memory WebSocket for testing
-const testServer = new WebSocketServer({
-  port: 0, // Random port
-  hostname: "localhost",
-});
-
-// Or use SimpleWorker in-process for testing
-const worker = new SimpleWorker({
-  workerId: 1,
-  wsUrl: "ws://localhost:8080/test",
+// Ensure jobFile paths are correct
+const jobId = await manager.schedule({
+  jobFile: "jobs/MyJob.ts", // Relative to projectRoot
+  jobPayload: payload,
 });
 ```
 
-## Benefits of Migration
+### Callback Context
 
-### Immediate Benefits
-
-- **Consistent API**: Same communication pattern everywhere
-- **Better debugging**: WebSocket traffic can be inspected with standard tools
-- **Platform flexibility**: Not tied to Node.js Worker threads
-- **Simplified testing**: No Worker thread mocking complexity
-
-### Future Benefits
-
-- **Distributed workers**: Run workers on different machines/containers
-- **Browser support**: Potential for browser-based workers
-- **Protocol extensions**: Easy to add custom message types
-- **Monitoring**: Standard WebSocket monitoring tools work
-
-## Backward Compatibility
-
-### Maintaining Compatibility During Transition
-
-If you need to maintain both systems during migration:
+Old callbacks that relied on `this` context need updates:
 
 ```typescript
-// Use environment variable to switch
-const useWebSocket = process.env.USE_WEBSOCKET === "true";
-
-const manager = useWebSocket
-  ? new WorkerManagerWS(orchestrator, config)
-  : new WorkerManager(orchestrator, config);
-
-await manager.initialize();
-// API is the same for both
-```
-
-### Gradual Migration Strategy
-
-1. **Phase 1**: Update to latest version with both systems available
-2. **Phase 2**: Switch non-critical workflows to WebSocket
-3. **Phase 3**: Migrate critical workflows after testing
-4. **Phase 4**: Remove postMessage dependencies
-
-## Common Issues and Solutions
-
-### Issue 1: Workers Not Connecting
-
-```typescript
-// Ensure orchestrator is started before workers
-await orchestrator.start();
-// Wait a moment for server to be ready
-await new Promise((resolve) => setTimeout(resolve, 1000));
-// Then start workers
-```
-
-### Issue 2: Connection Drops
-
-```typescript
-// SimpleWorker has auto-reconnect enabled by default
-// For custom workers, ensure reconnection logic:
-const worker = new BaseWorker({
-  // ... config
-  enableAutoReconnect: true,
-  reconnectInterval: 5000,
+// v1.x - this might refer to TaskManagerSingleton
+manager.scheduleNow("job.ts", payload, function (err, result) {
+  // this.getStatus() worked
 });
+
+// v2.x - use arrow functions or pass manager reference
+manager
+  .scheduleAndWait({
+    jobFile: "jobs/MyJob.ts",
+    jobPayload: payload,
+  })
+  .then((result) => {
+    manager.getStatus(); // Use manager directly
+  });
 ```
-
-### Issue 3: Performance Differences
-
-```typescript
-// WebSocket has slight overhead, batch operations for better performance
-const results = await workerManager.executeBatchJobs(jobs);
-// Instead of individual job execution
-```
-
-## Support and Resources
-
-- **Documentation**: See the updated API documentation
-- **Examples**: Check `examples/websocket/` directory
-- **Migration Support**: Open an issue with the `migration` label
-- **Community**: Join our Discord for migration help
-
-## Timeline
-
-- **v2.0.0** (Current): Both systems available, postMessage deprecated
-- **v2.x**: Bug fixes and improvements to WebSocket system
-- **v3.0.0** (Q2 2024): postMessage system removed entirely
-
-## Conclusion
-
-The migration from postMessage to WebSocket is designed to be straightforward while providing significant architectural improvements. The API remains largely unchanged, making the transition smooth for most use cases.
-
-For complex migrations or custom Worker implementations, please refer to the advanced migration examples in the `examples/migration/` directory.

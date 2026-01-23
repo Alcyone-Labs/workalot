@@ -13,7 +13,6 @@ import {
   BatchJobContext,
   BatchExecutionResult,
   JobSchedulingRequest,
-
   BaseJobExecutionContext,
 } from "../types/index.js";
 import { trace, metrics, SpanStatusCode } from "@opentelemetry/api";

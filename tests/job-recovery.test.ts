@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { unlink } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
 import { QueueManager } from "../src/queue/QueueManager.ts";
 import { PGLiteQueue } from "../src/queue/PGLiteQueue.ts";
 import { JobRecoveryService } from "../src/workers/JobRecoveryService.ts";
@@ -307,7 +308,9 @@ describe("Job Recovery System", () => {
     });
 
     afterEach(async () => {
-      await jobScheduler.shutdown();
+      if (jobScheduler) {
+        await jobScheduler.shutdown();
+      }
     });
 
     it("should include job recovery stats", async () => {

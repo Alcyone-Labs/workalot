@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { readFile } from "node:fs/promises";
+import { readFile, access, mkdir } from "node:fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { ulid } from "ulidx";
@@ -100,12 +100,17 @@ export class SQLiteQueue extends IQueueBackend {
       }
 
       // Handle memory:// URL format
-      const dbPath =
-        this.config.databaseUrl === "memory://"
-          ? isBun
-            ? ":memory:"
-            : ":memory:"
-          : this.config.databaseUrl;
+      const dbPath = this.config.databaseUrl === "memory://" ? ":memory:" : this.config.databaseUrl;
+
+      // Ensure parent directory exists for file-based databases
+      if (dbPath !== ":memory:" && dbPath !== "memory://") {
+        const dbDir = dirname(dbPath);
+        try {
+          await access(dbDir);
+        } catch {
+          await mkdir(dbDir, { recursive: true });
+        }
+      }
 
       if (isBun) {
         this.db = new Database(dbPath, {

@@ -20,6 +20,12 @@ export interface RedisQueueConfig extends QueueConfig {
   redisOptions?: RedisOptions;
 
   /**
+   * Pre-configured Redis client instance
+   * Useful for testing with ioredis-mock or shared connections
+   */
+  redisClient?: Redis;
+
+  /**
    * Key prefix for all Redis keys
    * Default: 'workalot'
    */
@@ -85,19 +91,24 @@ export class RedisQueue extends IQueueBackend {
     this.enablePubSub = config.enablePubSub || false;
     this.debug = config.debug || false;
 
-    // Initialize Redis client
-    if (config.redisUrl && config.redisOptions) {
-      this.redis = new Redis(config.redisUrl, config.redisOptions);
-    } else if (config.redisUrl) {
-      this.redis = new Redis(config.redisUrl);
-    } else if (config.redisOptions) {
-      this.redis = new Redis(config.redisOptions);
+    // Use injected Redis client if provided
+    if (config.redisClient) {
+      this.redis = config.redisClient;
     } else {
-      // Default to localhost
-      this.redis = new Redis({
-        host: "localhost",
-        port: 6379,
-      });
+      // Initialize Redis client
+      if (config.redisUrl && config.redisOptions) {
+        this.redis = new Redis(config.redisUrl, config.redisOptions);
+      } else if (config.redisUrl) {
+        this.redis = new Redis(config.redisUrl);
+      } else if (config.redisOptions) {
+        this.redis = new Redis(config.redisOptions);
+      } else {
+        // Default to localhost
+        this.redis = new Redis({
+          host: "localhost",
+          port: 6379,
+        });
+      }
     }
 
     // Error handling

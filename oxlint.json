@@ -1,8 +1,5 @@
 {
-  "ignorePatterns": [
-    "dist",
-    "node_modules"
-  ],
+  "ignorePatterns": ["dist", "node_modules"],
   "rules": {
     "correctness": "warn",
     "style": "allow",
