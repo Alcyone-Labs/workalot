@@ -152,5 +152,11 @@ export {
   type WebSocketClientConfig,
 } from "./communication/WebSocketClient.js";
 
+// Dashboard
+export {
+  DashboardServer,
+  type DashboardConfig,
+} from "./dashboard/index.js";
+
 // Re-export common utilities
 export { ulid } from "ulidx";
