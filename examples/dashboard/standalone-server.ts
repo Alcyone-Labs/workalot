@@ -362,7 +362,7 @@ const app = new Elysia()
   .use(staticPlugin({ assets: "examples/dashboard", prefix: "/dashboard" }))
   .get("/api/health", async () => {
     try {
-      return await fetch(API_BASE + "/health").then((r) => r.json());
+      return await fetch(API_BASE + "/api/health").then((r) => r.json());
     } catch {
       return {
         status: "error",

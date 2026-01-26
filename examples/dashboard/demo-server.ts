@@ -207,55 +207,51 @@ new Elysia()
   })
 
   // Server-Sent Events stream
-  .get("/api/stream", () => {
-    let controller: ReadableStreamDefaultController;
+  .get("/api/stream", async () => {
     const encoder = new TextEncoder();
+    let intervalId: any;
 
     const stream = new ReadableStream({
-      start(ctrl) {
-        controller = ctrl;
+      start(controller) {
         const send = (data: any) => {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+          } catch (e) {}
         };
 
         // Send initial stats
         taskManager.getQueueStats().then((stats) => {
-          send({ type: "stats", data: stats });
-        });
+          send({ type: "stats", data: stats, timestamp: new Date().toISOString() });
+        }).catch(() => {});
 
         taskManager.getWorkerStats().then((stats) => {
-          send({ type: "workers", data: stats });
-        });
+          send({ type: "workers", data: stats, timestamp: new Date().toISOString() });
+        }).catch(() => {});
 
         // Listen for job events
         const onJobEvent = async (event: string) => {
-          const queueStats = await taskManager.getQueueStats();
-          const workerStats = await taskManager.getWorkerStats();
-          send({
-            type: event,
-            data: {
-              stats: queueStats,
-              workers: workerStats,
+          try {
+            const queueStats = await taskManager.getQueueStats();
+            const workerStats = await taskManager.getWorkerStats();
+            send({
+              type: event,
+              data: { queue: queueStats, workers: workerStats },
               timestamp: new Date().toISOString(),
-            },
-          });
+            });
+          } catch (e) {}
         };
 
         (taskManager as any).emitter?.on("job-completed", () => onJobEvent("job-completed"));
         (taskManager as any).emitter?.on("job-started", () => onJobEvent("job-started"));
         (taskManager as any).emitter?.on("job-failed", () => onJobEvent("job-failed"));
 
-        // Send heartbeat every 5 seconds
-        const heartbeat = setInterval(() => {
+        // Send heartbeat every 3 seconds
+        intervalId = setInterval(() => {
           send({ type: "heartbeat", timestamp: new Date().toISOString() });
-        }, 5000);
-
-        return () => {
-          clearInterval(heartbeat);
-        };
+        }, 3000);
       },
       cancel() {
-        // Cleanup when connection closes
+        clearInterval(intervalId);
       },
     });
 
