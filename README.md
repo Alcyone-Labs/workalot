@@ -30,6 +30,7 @@ A high-performance, flexible job queue system for Node.js with multiple backend 
 - [Creating Jobs](#creating-jobs)
   - [Workflow Jobs with Meta Envelope](#workflow-jobs-with-meta-envelope)
 - [Examples](#examples)
+- [Dashboard](#dashboard)
 - [Migration Guide](#migration-guide)
 - [Best Practices](#best-practices)
 
@@ -694,6 +695,33 @@ Workalot provides several examples to help you get started:
 - [Custom Orchestration](./examples/custom-orchestration/) - Building custom orchestrators
 - [Error Handling](./examples/error-handling.ts) - Proper error handling in jobs
 - [Factory Pattern](./examples/factory-pattern.ts) - Using the factory pattern for better testability
+
+## Dashboard
+
+Run the dashboard locally during development:
+
+```bash
+pnpm run dashboard:dev
+```
+
+Build and run the compiled dashboard (matches the published CLI):
+
+```bash
+pnpm run dashboard
+```
+
+When using the published package, you can also run:
+
+```bash
+npx workalot-dashboard
+```
+
+Environment variables:
+
+- `BACKEND` - `memory`, `sqlite`, `pglite`, `postgresql`, or `redis`
+- `DB_URL` - Database connection string or file path
+- `PORT` - HTTP port (default: `3000`)
+- `HOSTNAME` - Hostname to bind (default: `localhost`)
 
 ### High-Throughput Processing
 

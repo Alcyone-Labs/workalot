@@ -148,7 +148,7 @@ function renderRecentJobs(jobs) {
         <tr>
             <td><span class="font-mono">${job.id.substring(0, 8)}...</span></td>
             <td>${renderStatusBadge(job.status)}</td>
-            <td>${new Date(job.createdAt || Date.now()).toLocaleTimeString()}</td>
+            <td>${formatTime(job.requestedAt || job.createdAt || job.startedAt || job.completedAt)}</td>
         </tr>
     `).join('');
 }
@@ -189,6 +189,7 @@ async function viewJobDetails(jobId) {
     try {
         const response = await fetch(`/api/jobs/${jobId}`);
         const job = await response.json();
+        const jobPayload = job.jobPayload || job.payload;
 
         const content = document.getElementById('job-details-content');
         content.innerHTML = `
@@ -202,7 +203,7 @@ async function viewJobDetails(jobId) {
             </div>
             <div class="detail-group">
                 <h4>Payload</h4>
-                <pre>${JSON.stringify(job.payload, null, 2)}</pre>
+                <pre>${JSON.stringify(jobPayload, null, 2)}</pre>
             </div>
             ${job.result ? `
             <div class="detail-group">
@@ -247,4 +248,11 @@ function closeModal() {
 function startPolling() {
     fetchStats();
     statsInterval = setInterval(fetchStats, 2000);
+}
+
+function formatTime(value) {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '-';
+    return date.toLocaleTimeString();
 }

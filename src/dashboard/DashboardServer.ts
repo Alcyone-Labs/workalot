@@ -5,7 +5,9 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { QueueFactory } from "../queue/QueueFactory.js";
 import { QueueConfig, JobStatus } from "../types/index.js";
+import type { QueueItem } from "../types/index.js";
 import { IQueueBackend } from "../queue/IQueueBackend.js";
+import { formatJobForApi } from "./formatJobForApi.js";
 
 export interface DashboardConfig {
   port?: number;
@@ -70,7 +72,7 @@ export class DashboardServer {
       const limit = parseInt((query as any).limit) || 50;
       const status = (query as any).status as string;
       const jobs = await this.getAllJobs(limit, status);
-      return jobs;
+      return jobs.map(formatJobForApi);
     });
 
     app.get("/api/jobs/:id", async ({ params, set }) => {
@@ -80,7 +82,7 @@ export class DashboardServer {
           set.status = 404;
           return { error: "Job not found" };
         }
-        return job;
+        return formatJobForApi(job);
       } catch (err) {
         set.status = 500;
         return { error: `Error fetching job: ${err}` };
@@ -117,7 +119,7 @@ export class DashboardServer {
       ? [statusFilter as JobStatus]
       : [JobStatus.PENDING, JobStatus.PROCESSING, JobStatus.COMPLETED, JobStatus.FAILED];
 
-    let allJobs: any[] = [];
+    let allJobs: QueueItem[] = [];
 
     for (const status of statuses) {
       try {
@@ -130,8 +132,8 @@ export class DashboardServer {
 
     return allJobs
       .sort((a, b) => {
-        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        const timeA = a.requestedAt ? a.requestedAt.getTime() : 0;
+        const timeB = b.requestedAt ? b.requestedAt.getTime() : 0;
         return timeB - timeA;
       })
       .slice(0, limit);

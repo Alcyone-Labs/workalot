@@ -158,5 +158,11 @@ export {
   type DashboardConfig,
 } from "./dashboard/index.js";
 
+// Dashboard
+export {
+  DashboardServer,
+  type DashboardConfig,
+} from "./dashboard/index.js";
+
 // Re-export common utilities
 export { ulid } from "ulidx";
