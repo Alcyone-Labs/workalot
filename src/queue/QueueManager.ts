@@ -127,6 +127,13 @@ export class QueueManager extends IQueueBackend {
         item.error = error;
         this.emit('item-failed', item);
         break;
+      case JobStatus.CANCELLED:
+        item.completedAt = now;
+        item.error = error || new Error('Job cancelled');
+        this.emit('item-failed', item); // Treat as failed for event purposes or add new event?
+        // Let's rely on item-updated for generic updates, but for consistency lets emit item-failed or similar.
+        // Or better, just stick to item-updated which is always emitted.
+        break;
     }
 
     this.emit('item-updated', item);
@@ -224,6 +231,7 @@ export class QueueManager extends IQueueBackend {
       processing: 0,
       completed: 0,
       failed: 0,
+      cancelled: 0,
       oldestPending: undefined as Date | undefined
     };
 
@@ -246,6 +254,9 @@ export class QueueManager extends IQueueBackend {
           break;
         case JobStatus.FAILED:
           stats.failed++;
+          break;
+        case JobStatus.CANCELLED:
+          stats.cancelled++;
           break;
       }
     }

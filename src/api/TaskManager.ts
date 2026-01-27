@@ -223,8 +223,11 @@ export class TaskManager extends EventEmitter {
       case 'failed':
         jobStatus = JobStatus.FAILED;
         break;
+      case 'cancelled':
+        jobStatus = JobStatus.CANCELLED;
+        break;
       default:
-        throw new Error(`Invalid job status: ${status}. Valid statuses are: pending, processing, completed, failed`);
+        throw new Error(`Invalid job status: ${status}. Valid statuses are: pending, processing, completed, failed, cancelled`);
     }
 
     return await this.queueManager.getJobsByStatus(jobStatus);
