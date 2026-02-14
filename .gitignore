@@ -20,3 +20,10 @@ examples/**/*.d.ts.map
 
 # Keep only essential docs (performance charts, etc.)
 # All documentation is consolidated in README.md
+
+.gemini
+.opencode
+.factory
+.antigravity
+.claude
+.agents

@@ -1,0 +1,127 @@
+{
+  "name": "@alcyone-labs/workalot",
+  "version": "2.0.0-alpha",
+  "description": "High-performance, multi-threaded job queue system for NodeJS/BunJS. Achieve high throughput jobs/sec with linear worker scaling.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./types": {
+      "import": "./dist/types/index.js",
+      "types": "./dist/types/index.d.ts"
+    },
+    "./types/*": {
+      "import": "./dist/types/*.js",
+      "types": "./dist/types/*.d.ts"
+    },
+    "./queue": {
+      "import": "./dist/queue/index.js",
+      "types": "./dist/queue/index.d.ts"
+    },
+    "./queue/*": {
+      "import": "./dist/queue/*.js",
+      "types": "./dist/queue/*.d.ts"
+    },
+    "./workers": {
+      "import": "./dist/workers/index.js",
+      "types": "./dist/workers/index.d.ts"
+    },
+    "./workers/*": {
+      "import": "./dist/workers/*.js",
+      "types": "./dist/workers/*.d.ts"
+    },
+    "./api": {
+      "import": "./dist/api/index.js",
+      "types": "./dist/api/index.d.ts"
+    },
+    "./api/*": {
+      "import": "./dist/api/*.js",
+      "types": "./dist/api/*.d.ts"
+    },
+    "./jobs": {
+      "import": "./dist/jobs/index.js",
+      "types": "./dist/jobs/index.d.ts"
+    },
+    "./jobs/*": {
+      "import": "./dist/jobs/*.js",
+      "types": "./dist/jobs/*.d.ts"
+    }
+  },
+  "imports": {
+    "#/*": "./src/*",
+    "#examples/jobs/*": "./examples/_jobs/*"
+  },
+  "scripts": {
+    "build": "tsc && tsc-alias && cp -r src/queue/migrations dist/queue/",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit",
+    "typecheck:examples": "tsc --project tsconfig.examples.json --noEmit",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "benchmark": "pnpm run build && bun run benchmarks/run-benchmarks.ts",
+    "benchmark:easy": "pnpm run build && bun run benchmarks/run-benchmarks.ts --difficulty easy",
+    "benchmark:quick": "pnpm run build && bun run benchmarks/run-benchmarks.ts --configs 2-cores-10k-jobs,4-cores-10k-jobs",
+    "benchmark:quick:easy": "pnpm run build && bun run benchmarks/run-benchmarks.ts --configs 2-cores-10k-jobs,4-cores-10k-jobs --difficulty easy",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "pnpm run clean && pnpm run build"
+  },
+  "keywords": [
+    "job-queue",
+    "multi-threaded",
+    "worker-threads",
+    "high-performance",
+    "task-management",
+    "scaling"
+  ],
+  "author": "Nicolas Embleton <nicolas.embleton@gmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/alcyone-labs/workalot#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alcyone-labs/workalot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/alcyone-labs/workalot/issues"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@elysiajs/cors": "^1.4.1",
+    "@elysiajs/static": "^1.4.7",
+    "elysia": "^1.4.22",
+    "ioredis": "^5.9.2",
+    "postgres": "^3.4.8",
+    "ulidx": "^2.4.1"
+  },
+  "optionalDependencies": {
+    "@electric-sql/pglite": "^0.3.15",
+    "better-sqlite3": "^12.6.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/bun": "^1.3.8",
+    "@types/cli-progress": "^3.11.6",
+    "@types/ioredis": "^5.0.0",
+    "@types/node": "^25.1.0",
+    "cli-progress": "^3.12.0",
+    "tsc-alias": "^1.8.16",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "vite-tsconfig-paths": "^6.0.5",
+    "vitest": "^4.0.18"
+  }
+}
