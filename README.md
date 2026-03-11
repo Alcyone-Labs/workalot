@@ -30,6 +30,7 @@ A high-performance, flexible job queue system for Node.js with multiple backend 
 - [Creating Jobs](#creating-jobs)
   - [Workflow Jobs with Meta Envelope](#workflow-jobs-with-meta-envelope)
 - [Examples](#examples)
+- [Dashboard](#dashboard)
 - [Migration Guide](#migration-guide)
 - [Best Practices](#best-practices)
 
@@ -58,8 +59,26 @@ await destroyTaskManager("main");
 
 ## Installation
 
+> **⚠️ IMPORTANT**: This project uses **pnpm** as its package manager. Do not use npm or yarn, as they are not supported.
+
 ```bash
-npm install @alcyone-labs/workalot
+# Install pnpm if you don't have it
+npm install -g pnpm
+
+# Install the core package
+pnpm add @alcyone-labs/workalot
+```
+
+### Optional Packages
+
+Workalot is now a monorepo with optional packages for extended functionality:
+
+```bash
+# Dashboard - Web-based control plane (optional)
+pnpm add @alcyone-labs/workalot-dashboard
+
+# Telemetry - OpenTelemetry observability (optional)
+pnpm add @alcyone-labs/workalot-telemetry
 ```
 
 ### Optional Backend Dependencies
@@ -68,16 +87,16 @@ Depending on your chosen backend, you may need additional dependencies:
 
 ```bash
 # For SQLite backend (Node.js)
-npm install better-sqlite3
+pnpm add better-sqlite3
 
 # For PostgreSQL backend
-npm install postgres
+pnpm add postgres
 
 # For PGLite backend (WebAssembly PostgreSQL)
-npm install @electric-sql/pglite
+pnpm add @electric-sql/pglite
 
 # For Redis backend
-npm install ioredis
+pnpm add ioredis
 ```
 
 **Note**: If using Bun runtime, SQLite is built-in and doesn't require additional dependencies.
@@ -685,6 +704,148 @@ Workalot provides several examples to help you get started:
 - [Custom Orchestration](./examples/custom-orchestration/) - Building custom orchestrators
 - [Error Handling](./examples/error-handling.ts) - Proper error handling in jobs
 - [Factory Pattern](./examples/factory-pattern.ts) - Using the factory pattern for better testability
+
+## Monorepo Structure
+
+Workalot is organized as a monorepo with three packages:
+
+```
+@alcyone-labs/workalot           # Core job queue system
+@alcyone-labs/workalot-telemetry # OpenTelemetry observability
+@alcyone-labs/workalot-dashboard # Web-based control plane
+```
+
+### Core Package
+
+The core package (`@alcyone-labs/workalot`) contains everything you need for job processing:
+- TaskManager API
+- Queue backends (Memory, SQLite, PGLite, PostgreSQL, Redis)
+- Worker management
+- Job execution framework
+
+### Telemetry Package (Optional)
+
+The telemetry package (`@alcyone-labs/workalot-telemetry`) provides:
+- OpenTelemetry distributed tracing
+- Prometheus metrics export
+- Job lifecycle tracking
+- Queue and worker statistics
+
+```typescript
+import { TelemetryService } from "@alcyone-labs/workalot-telemetry";
+
+const telemetry = TelemetryService.getInstance({
+  enabled: true,
+  serviceName: "my-service",
+  prometheus: { enabled: true, port: 9090 }
+});
+
+await telemetry.initialize();
+```
+
+### Dashboard Package (Optional)
+
+The dashboard package (`@alcyone-labs/workalot-dashboard`) provides:
+- Web-based job monitoring and management
+- Real-time job status updates via WebSocket
+- Bulk operations (retry, cancel)
+- Job search functionality
+- Authentication support (JWT, API keys)
+
+```typescript
+import { DashboardServer } from "@alcyone-labs/workalot-dashboard";
+
+const dashboard = new DashboardServer({
+  port: 3000,
+  queueConfig: { backend: "redis", databaseUrl: "redis://localhost:6379" }
+});
+
+await dashboard.start();
+```
+
+## Dashboard
+
+The dashboard is now a separate package (`@alcyone-labs/workalot-dashboard`). Install it:
+
+```bash
+pnpm add @alcyone-labs/workalot-dashboard
+```
+
+### Running the Dashboard
+
+**Using the CLI:**
+
+```bash
+npx workalot-dashboard
+```
+
+**Programmatically:**
+
+```typescript
+import { DashboardServer } from "@alcyone-labs/workalot-dashboard";
+
+const dashboard = new DashboardServer({
+  port: 3000,
+  hostname: "localhost",
+  queueConfig: {
+    backend: "postgresql",
+    databaseUrl: "postgres://user:pass@localhost/workalot"
+  },
+  auth: {
+    enabled: true,
+    apiKeys: ["your-secret-api-key"]
+  },
+  telemetry: {
+    enabled: true,
+    serviceName: "workalot-dashboard"
+  }
+});
+
+await dashboard.start();
+```
+
+**Environment variables:**
+
+- `BACKEND` - `memory`, `sqlite`, `pglite`, `postgresql`, or `redis`
+- `DB_URL` - Database connection string or file path
+- `PORT` - Dashboard port (default: 3000)
+- `HOSTNAME` - Dashboard hostname (default: localhost)
+
+### Dashboard Features
+
+- **Real-time updates** - Live job status changes via WebSocket
+- **Job management** - View, search, retry, and cancel jobs
+- **Bulk operations** - Retry or cancel multiple jobs at once
+- **Worker monitoring** - Track connected workers and their status
+- **Job search** - Search by job ID or payload content
+- **Authentication** - JWT or API key authentication
+- **Metrics** - Prometheus-compatible metrics at `/metrics`
+
+### Dashboard API
+
+The dashboard exposes a REST API:
+
+```
+GET  /health                      - Health check
+GET  /metrics                    - Prometheus metrics
+
+GET  /api/stats                  - Queue and worker statistics
+GET  /api/workers                - List all workers
+GET  /api/workers/:id            - Get worker details
+
+GET  /api/jobs                   - List jobs with filters
+GET  /api/jobs/:id               - Get job details
+POST /api/jobs/:id/retry         - Retry a job
+POST /api/jobs/:id/stop          - Cancel a job
+
+POST /api/jobs/bulk/retry        - Bulk retry jobs
+POST /api/jobs/bulk/cancel       - Bulk cancel jobs
+
+GET  /api/jobs/search?q=...      - Search jobs
+
+WS   /ws                         - WebSocket for real-time updates
+- `PORT` - HTTP port (default: `3000`)
+- `HOSTNAME` - Hostname to bind (default: `localhost`)
 
 ### High-Throughput Processing
 

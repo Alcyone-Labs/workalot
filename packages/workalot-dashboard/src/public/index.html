@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workalot Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚀</text></svg>">
+</head>
+<body>
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="brand">
+                <h1>Workalot</h1>
+                <span class="version">v2.0</span>
+            </div>
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active" data-view="dashboard">
+                    <span class="icon">📊</span> Dashboard
+                </a>
+                <a href="#" class="nav-item" data-view="jobs">
+                    <span class="icon">📋</span> Jobs
+                </a>
+                <a href="#" class="nav-item" data-view="workers">
+                    <span class="icon">🤖</span> Workers
+                </a>
+                <a href="#" class="nav-item" data-view="simulation">
+                    <span class="icon">🧪</span> Simulation
+                </a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-bar">
+                <h2 id="page-title">Dashboard</h2>
+                <div class="connection-status">
+                    <span class="status-dot connected"></span>
+                    <span id="connection-text">Connected</span>
+                </div>
+            </header>
+
+            <div id="view-dashboard" class="view-section">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon pending">⏳</div>
+                        <div class="stat-info">
+                            <h3>Pending</h3>
+                            <p class="stat-value" id="stats-pending">-</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon processing">⚙️</div>
+                        <div class="stat-info">
+                            <h3>Processing</h3>
+                            <p class="stat-value" id="stats-processing">-</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon completed">✅</div>
+                        <div class="stat-info">
+                            <h3>Completed</h3>
+                            <p class="stat-value" id="stats-completed">-</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon failed">❌</div>
+                        <div class="stat-info">
+                            <h3>Failed</h3>
+                            <p class="stat-value" id="stats-failed">-</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon cancelled">🚫</div>
+                        <div class="stat-info">
+                            <h3>Cancelled</h3>
+                            <p class="stat-value" id="stats-cancelled">-</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-row">
+                    <div class="card recent-jobs">
+                        <div class="card-header">
+                            <h3>Recent Jobs</h3>
+                            <button class="btn-text" onclick="showView('jobs')">View All</button>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Status</th>
+                                        <th>Created At</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recent-jobs-table">
+                                    <tr><td colspan="3" class="text-center">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="card worker-status">
+                        <div class="card-header">
+                            <h3>Worker Status</h3>
+                            <button class="btn-text" onclick="showView('workers')">Details</button>
+                        </div>
+                        <div class="worker-summary">
+                            <div class="summary-item">
+                                <span class="label">Total Workers</span>
+                                <span class="value" id="worker-total">-</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="label">Busy</span>
+                                <span class="value" id="worker-busy">-</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="label">Available</span>
+                                <span class="value" id="worker-available">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-jobs" class="view-section hidden">
+                <div class="filters-bar">
+                    <select id="status-filter">
+                        <option value="all">All Statuses</option>
+                        <option value="pending">Pending</option>
+                        <option value="processing">Processing</option>
+                        <option value="completed">Completed</option>
+                        <option value="failed">Failed</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                    <button class="btn-secondary" onclick="createManualJob()">+ New Job</button>
+                    <div class="streaming-indicator">
+                         <span class="dot pulse"></span> Live
+                    </div>
+                </div>
+                <div class="card full-height-card">
+                    <div class="virtual-list-header">
+                        <div class="col-id">ID</div>
+                        <div class="col-status">Status</div>
+                        <div class="col-result">Result/Error</div>
+                        <div class="col-actions">Actions</div>
+                    </div>
+                    <div id="virtual-list-container" class="virtual-list-container">
+                        <div id="virtual-list-content" class="virtual-list-content">
+                            <!-- Virtual Items -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-workers" class="view-section hidden">
+                <div class="card">
+                    <h3>Connected Workers</h3>
+                    <div id="workers-list" class="workers-grid">
+                        <!-- Worker cards will be inserted here -->
+                        <p>Worker details coming soon...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-simulation" class="view-section hidden">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Local Job Creator (Simulation)</h3>
+                    </div>
+                    <div class="simulation-controls">
+                        <div class="control-group">
+                            <label>Status:</label>
+                            <span id="sim-status-badge" class="badge">Stopped</span>
+                        </div>
+                        <div class="control-group">
+                            <button id="btn-start-sim" class="btn-primary" onclick="startSimulation()">Start Simulation</button>
+                            <button id="btn-stop-sim" class="btn-danger hidden" onclick="stopSimulation()">Stop Simulation</button>
+                        </div>
+                    </div>
+                    <div class="simulation-info">
+                        <p>The simulator creates random jobs locally on the server to demonstrate queue activity without needing external producers.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Job Details Modal -->
+    <div id="job-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Job Details</h3>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="job-details-content">
+                <!-- Details injected here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

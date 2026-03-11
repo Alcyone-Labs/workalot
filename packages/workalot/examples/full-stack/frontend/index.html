@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Workalot Full-Stack Example</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>🚀 Workalot Full-Stack Example</h1>
+        <p>Background job processing with real-time status updates</p>
+      </header>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Jobs</div>
+          <div class="stat-value" id="total-jobs">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Running</div>
+          <div class="stat-value" id="running-jobs">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Completed</div>
+          <div class="stat-value" id="completed-jobs">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Workers</div>
+          <div class="stat-value" id="worker-count">0</div>
+        </div>
+      </div>
+
+      <div class="job-submission">
+        <h2>Submit a Job</h2>
+
+        <div class="job-type-selector">
+          <button class="job-type-btn active" data-type="image-processing">
+            📸 Image Processing
+          </button>
+          <button class="job-type-btn" data-type="data-analysis">📊 Data Analysis</button>
+          <button class="job-type-btn" data-type="report-generation">📄 Report Generation</button>
+        </div>
+
+        <div class="job-form" id="image-processing-form">
+          <h3>Image Processing</h3>
+          <div class="form-group">
+            <label>Image URL</label>
+            <input
+              type="text"
+              id="image-url"
+              placeholder="https://example.com/image.jpg"
+              value="https://picsum.photos/1920/1080"
+            />
+          </div>
+          <div class="form-group">
+            <label>Operations</label>
+            <div class="checkbox-group">
+              <label><input type="checkbox" value="resize" checked /> Resize</label>
+              <label><input type="checkbox" value="compress" checked /> Compress</label>
+              <label><input type="checkbox" value="grayscale" /> Grayscale</label>
+              <label><input type="checkbox" value="blur" /> Blur</label>
+            </div>
+          </div>
+          <button class="submit-btn" onclick="submitImageJob()">Process Image</button>
+        </div>
+
+        <div class="job-form hidden" id="data-analysis-form">
+          <h3>Data Analysis</h3>
+          <div class="form-group">
+            <label>Dataset</label>
+            <select id="dataset">
+              <option value="sales-2024">Sales 2024</option>
+              <option value="users-2024">Users 2024</option>
+              <option value="revenue-2024">Revenue 2024</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Operations</label>
+            <div class="checkbox-group">
+              <label><input type="checkbox" value="aggregate" checked /> Aggregate</label>
+              <label><input type="checkbox" value="trend-analysis" checked /> Trend Analysis</label>
+              <label><input type="checkbox" value="group-by" /> Group By</label>
+            </div>
+          </div>
+          <button class="submit-btn" onclick="submitDataJob()">Analyze Data</button>
+        </div>
+
+        <div class="job-form hidden" id="report-generation-form">
+          <h3>Report Generation</h3>
+          <div class="form-group">
+            <label>Report Type</label>
+            <select id="report-type">
+              <option value="monthly-summary">Monthly Summary</option>
+              <option value="quarterly-review">Quarterly Review</option>
+              <option value="annual-report">Annual Report</option>
+              <option value="sales-report">Sales Report</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Format</label>
+            <select id="report-format">
+              <option value="pdf">PDF</option>
+              <option value="excel">Excel</option>
+              <option value="csv">CSV</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label><input type="checkbox" id="include-charts" checked /> Include Charts</label>
+            <label><input type="checkbox" id="include-summary" checked /> Include Summary</label>
+          </div>
+          <button class="submit-btn" onclick="submitReportJob()">Generate Report</button>
+        </div>
+      </div>
+
+      <div class="jobs-list">
+        <div class="jobs-header">
+          <h2>Recent Jobs</h2>
+          <button class="clear-btn" onclick="clearJobs()">Clear All</button>
+        </div>
+        <div id="jobs-container">
+          <div class="empty-state">No jobs yet. Submit a job to get started!</div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

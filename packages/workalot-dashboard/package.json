@@ -1,0 +1,60 @@
+{
+  "name": "@alcyone-labs/workalot-dashboard",
+  "version": "2.0.0-alpha",
+  "description": "Web-based dashboard and control plane for Workalot job queue",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "workalot-dashboard": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./middleware": {
+      "import": "./dist/middleware/index.js",
+      "types": "./dist/middleware/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc && tsc-alias && cp -r src/public dist/",
+    "dev": "tsc --watch",
+    "start": "node dist/cli.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@alcyone-labs/workalot": "workspace:*",
+    "@alcyone-labs/workalot-telemetry": "workspace:*",
+    "@elysiajs/cors": "^1.4.1",
+    "@elysiajs/static": "^1.4.7",
+    "elysia": "^1.4.22"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.8",
+    "@types/node": "^25.1.0",
+    "tsc-alias": "^1.8.16",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "workalot",
+    "dashboard",
+    "job-queue",
+    "monitoring",
+    "control-plane"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}

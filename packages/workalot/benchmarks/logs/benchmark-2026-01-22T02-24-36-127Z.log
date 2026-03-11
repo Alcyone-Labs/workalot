@@ -1,0 +1,686 @@
+================================================================================
+Workalot Benchmark Suite - Log Started
+Timestamp: 2026-01-22T02:24:36.127Z
+System: darwin arm64
+Node Version: v24.3.0
+CPU Cores: 12
+Memory: 64GB
+================================================================================
+[2026-01-22T02:24:36.138Z]    +12ms INFO  CLI             Starting benchmark suite
+{
+  "configs": [
+    "2-cores-1k-jobs-memory",
+    "4-cores-1k-jobs-memory",
+    "6-cores-1k-jobs-memory",
+    "2-cores-10k-jobs-memory",
+    "4-cores-10k-jobs-memory",
+    "6-cores-10k-jobs-memory",
+    "2-cores-1k-jobs-pglite",
+    "4-cores-1k-jobs-pglite",
+    "6-cores-1k-jobs-pglite",
+    "2-cores-1k-jobs-pglite-file",
+    "4-cores-1k-jobs-pglite-file",
+    "6-cores-1k-jobs-pglite-file",
+    "2-cores-10k-jobs-pglite",
+    "4-cores-10k-jobs-pglite",
+    "6-cores-10k-jobs-pglite",
+    "2-cores-10k-jobs-pglite-file",
+    "4-cores-10k-jobs-pglite-file",
+    "6-cores-10k-jobs-pglite-file",
+    "2-cores-1k-jobs-sqlite-memory",
+    "4-cores-1k-jobs-sqlite-memory",
+    "6-cores-1k-jobs-sqlite-memory",
+    "2-cores-1k-jobs-sqlite-file",
+    "4-cores-1k-jobs-sqlite-file",
+    "6-cores-1k-jobs-sqlite-file",
+    "2-cores-10k-jobs-sqlite-memory",
+    "4-cores-10k-jobs-sqlite-memory",
+    "6-cores-10k-jobs-sqlite-memory",
+    "2-cores-10k-jobs-sqlite-file",
+    "4-cores-10k-jobs-sqlite-file",
+    "6-cores-10k-jobs-sqlite-file",
+    "2-cores-1k-jobs-redis",
+    "4-cores-1k-jobs-redis",
+    "6-cores-1k-jobs-redis",
+    "2-cores-10k-jobs-redis",
+    "4-cores-10k-jobs-redis",
+    "6-cores-10k-jobs-redis"
+  ],
+  "difficulty": 1,
+  "outputDir": "benchmarks/results"
+}
+[2026-01-22T02:24:36.138Z]    +12ms INFO  BENCHMARK       About to start benchmark execution: 2-cores-1k-jobs-memory
+{
+  "benchmarkIndex": 1,
+  "totalBenchmarks": 36,
+  "configName": "2-cores-1k-jobs-memory",
+  "processId": 41456,
+  "memoryUsage": {
+    "rss": 85786624,
+    "heapTotal": 5311488,
+    "heapUsed": 3301414,
+    "external": 991454,
+    "arrayBuffers": 120
+  }
+}
+[2026-01-22T02:24:36.141Z]    +15ms INFO  BENCHMARK       Starting benchmark: 2-cores-1k-jobs-memory
+{
+  "cores": 2,
+  "totalJobs": 1000,
+  "backend": "memory",
+  "taskTypes": [
+    {
+      "name": "light",
+      "cpuCycles": 1000,
+      "weight": 0.3
+    },
+    {
+      "name": "medium",
+      "cpuCycles": 10000,
+      "weight": 0.4
+    },
+    {
+      "name": "heavy",
+      "cpuCycles": 50000,
+      "weight": 0.2
+    },
+    {
+      "name": "intensive",
+      "cpuCycles": 100000,
+      "weight": 0.1
+    }
+  ]
+}
+[2026-01-22T02:24:36.142Z]    +16ms INFO  SETUP           Initializing task manager
+{
+  "maxThreads": 2,
+  "backend": "memory"
+}
+[2026-01-22T02:24:36.168Z]    +42ms INFO  SETUP           TaskManager initialized successfully
+[2026-01-22T02:24:36.168Z]    +42ms DEBUG JOBS            Task types after difficulty scaling
+{
+  "original": [
+    {
+      "name": "light",
+      "cpuCycles": 1000,
+      "weight": 0.3
+    },
+    {
+      "name": "medium",
+      "cpuCycles": 10000,
+      "weight": 0.4
+    },
+    {
+      "name": "heavy",
+      "cpuCycles": 50000,
+      "weight": 0.2
+    },
+    {
+      "name": "intensive",
+      "cpuCycles": 100000,
+      "weight": 0.1
+    }
+  ],
+  "scaled": [
+    {
+      "name": "light",
+      "cpuCycles": 1000,
+      "weight": 0.3
+    },
+    {
+      "name": "medium",
+      "cpuCycles": 10000,
+      "weight": 0.4
+    },
+    {
+      "name": "heavy",
+      "cpuCycles": 50000,
+      "weight": 0.2
+    },
+    {
+      "name": "intensive",
+      "cpuCycles": 100000,
+      "weight": 0.1
+    }
+  ]
+}
+[2026-01-22T02:24:36.171Z]    +45ms INFO  SETUP           Generated 1000 job payloads
+[2026-01-22T02:24:36.172Z]    +46ms INFO  PHASE           Starting execution phase
+{
+  "cores": 2,
+  "totalJobs": 1000
+}
+[2026-01-22T02:24:41.291Z]  +5165ms DEBUG SYSTEM          System performance stats
+{
+  "phase": "queueing",
+  "duration": 5117,
+  "peakCPU": 25.006341233773753,
+  "peakMemory": 103088128,
+  "averageCPU": 25.005873646332837,
+  "averageMemory": 94270002.19607843
+}
+[2026-01-22T02:24:41.291Z]  +5165ms INFO  PHASE           Completed execution phase in 5117ms
+[2026-01-22T02:24:41.293Z]  +5167ms INFO  CLEANUP         Cleaning up worker event listeners
+[2026-01-22T02:24:41.294Z]  +5168ms INFO  CLEANUP         Worker event listeners cleaned up
+[2026-01-22T02:24:41.295Z]  +5169ms INFO  CLEANUP         Shutting down task manager
+[2026-01-22T02:24:41.433Z]  +5307ms INFO  CLEANUP         Task manager shutdown completed
+[2026-01-22T02:24:41.433Z]  +5307ms INFO  CLEANUP         Cleaning up queue state file
+[2026-01-22T02:24:41.437Z]  +5311ms INFO  CLEANUP         Queue state file cleaned up
+[2026-01-22T02:24:41.439Z]  +5313ms INFO  CLEANUP         Creating benchmark result
+[2026-01-22T02:24:41.441Z]  +5315ms INFO  CLEANUP         Logging benchmark completion
+[2026-01-22T02:24:41.444Z]  +5318ms INFO  BENCHMARK       Completed benchmark: 2-cores-1k-jobs-memory
+{
+  "totalTime": 5151,
+  "jobsPerSecond": 194.1370607649,
+  "queueingDuration": 0,
+  "executionDuration": 5117
+}
+[2026-01-22T02:24:41.445Z]  +5319ms INFO  CLEANUP         Benchmark runner completed successfully
+[2026-01-22T02:24:41.446Z]  +5320ms INFO  BENCHMARK       Benchmark execution completed: 2-cores-1k-jobs-memory
+{
+  "benchmarkIndex": 1,
+  "totalBenchmarks": 36,
+  "configName": "2-cores-1k-jobs-memory",
+  "processId": 41456,
+  "memoryUsage": {
+    "rss": 62586880,
+    "heapTotal": 7480320,
+    "heapUsed": 8163673,
+    "external": 2554281,
+    "arrayBuffers": 120
+  },
+  "resultSummary": {
+    "totalTime": 5151,
+    "jobsPerSecond": 194.1370607649
+  }
+}
+[2026-01-22T02:24:41.448Z]  +5322ms INFO  RESULT          Benchmark 2-cores-1k-jobs-memory completed
+{
+  "totalTime": 5151,
+  "jobsPerSecond": 194.1370607649,
+  "queueingDuration": 0,
+  "executionDuration": 5117
+}
+[2026-01-22T02:24:41.449Z]  +5323ms INFO  BENCHMARK       Waiting 1 second for cleanup to complete
+[2026-01-22T02:24:42.451Z]  +6325ms INFO  BENCHMARK       Completed benchmark 1/36, cooling down before next benchmark
+{
+  "completedBenchmark": "2-cores-1k-jobs-memory",
+  "nextBenchmark": "4-cores-1k-jobs-memory",
+  "processId": 41456,
+  "memoryUsage": {
+    "rss": 59523072,
+    "heapTotal": 7219200,
+    "heapUsed": 8215373,
+    "external": 2588989,
+    "arrayBuffers": 120
+  }
+}
+[2026-01-22T02:24:44.454Z]  +8328ms INFO  BENCHMARK       Starting benchmark 2/36
+{
+  "nextBenchmark": "4-cores-1k-jobs-memory",
+  "processId": 41456,
+  "memoryUsage": {
+    "rss": 59539456,
+    "heapTotal": 7220224,
+    "heapUsed": 8216451,
+    "external": 2589363,
+    "arrayBuffers": 120
+  }
+}
+[2026-01-22T02:24:44.455Z]  +8329ms INFO  BENCHMARK       About to start benchmark execution: 4-cores-1k-jobs-memory
+{
+  "benchmarkIndex": 2,
+  "totalBenchmarks": 36,
+  "configName": "4-cores-1k-jobs-memory",
+  "processId": 41456,
+  "memoryUsage": {
+    "rss": 59539456,
+    "heapTotal": 7220224,
+    "heapUsed": 8216451,
+    "external": 2589363,
+    "arrayBuffers": 120
+  }
+}
+[2026-01-22T02:24:44.458Z]  +8332ms INFO  BENCHMARK       Starting benchmark: 4-cores-1k-jobs-memory
+{
+  "cores": 4,
+  "totalJobs": 1000,
+  "backend": "memory",
+  "taskTypes": [
+    {
+      "name": "light",
+      "cpuCycles": 1000,
+      "weight": 0.3
+    },
+    {
+      "name": "medium",
+      "cpuCycles": 10000,
+      "weight": 0.4
+    },
+    {
+      "name": "heavy",
+      "cpuCycles": 50000,
+      "weight": 0.2
+    },
+    {
+      "name": "intensive",
+      "cpuCycles": 100000,
+      "weight": 0.1
+    }
+  ]
+}
+[2026-01-22T02:24:44.461Z]  +8335ms INFO  SETUP           Initializing task manager
+{
+  "maxThreads": 4,
+  "backend": "memory"
+}
+[2026-01-22T02:24:44.478Z]  +8352ms INFO  SETUP           TaskManager initialized successfully
+[2026-01-22T02:24:44.478Z]  +8352ms DEBUG JOBS            Task types after difficulty scaling
+{
+  "original": [
+    {
+      "name": "light",
+      "cpuCycles": 1000,
+      "weight": 0.3
+    },
+    {
+      "name": "medium",
+      "cpuCycles": 10000,
+      "weight": 0.4
+    },
+    {
+      "name": "heavy",
+      "cpuCycles": 50000,
+      "weight": 0.2
+    },
+    {
+      "name": "intensive",
+      "cpuCycles": 100000,
+      "weight": 0.1
+    }
+  ],
+  "scaled": [
+    {
+      "name": "light",
+      "cpuCycles": 1000,
+      "weight": 0.3
+    },
+    {
+      "name": "medium",
+      "cpuCycles": 10000,
+      "weight": 0.4
+    },
+    {
+      "name": "heavy",
+      "cpuCycles": 50000,
+      "weight": 0.2
+    },
+    {
+      "name": "intensive",
+      "cpuCycles": 100000,
+      "weight": 0.1
+    }
+  ]
+}
+[2026-01-22T02:24:44.480Z]  +8354ms INFO  SETUP           Generated 1000 job payloads
+[2026-01-22T02:24:44.481Z]  +8355ms INFO  PHASE           Starting execution phase
+{
+  "cores": 4,
+  "totalJobs": 1000
+}
+[2026-01-22T02:24:46.992Z] +10866ms DEBUG SYSTEM          System performance stats
+{
+  "phase": "queueing",
+  "duration": 2510,
+  "peakCPU": 25.007058192276915,
+  "peakMemory": 67026944,
+  "averageCPU": 25.007033554636468,
+  "averageMemory": 65489368.615384616
+}
+[2026-01-22T02:24:46.993Z] +10867ms INFO  PHASE           Completed execution phase in 2510ms
+[2026-01-22T02:24:46.996Z] +10870ms INFO  CLEANUP         Cleaning up worker event listeners
+[2026-01-22T02:24:46.997Z] +10871ms INFO  CLEANUP         Worker event listeners cleaned up
+[2026-01-22T02:24:46.998Z] +10872ms INFO  CLEANUP         Shutting down task manager
+[2026-01-22T02:24:47.104Z] +10978ms INFO  CLEANUP         Task manager shutdown completed
+[2026-01-22T02:24:47.104Z] +10978ms INFO  CLEANUP         Cleaning up queue state file
+[2026-01-22T02:24:47.106Z] +10980ms INFO  CLEANUP         Queue state file cleaned up
+[2026-01-22T02:24:47.108Z] +10982ms INFO  CLEANUP         Creating benchmark result
+[2026-01-22T02:24:47.110Z] +10984ms INFO  CLEANUP         Logging benchmark completion
+[2026-01-22T02:24:47.112Z] +10986ms INFO  BENCHMARK       Completed benchmark: 4-cores-1k-jobs-memory
+{
+  "totalTime": 2535,
+  "jobsPerSecond": 394.4773175542406,
+  "queueingDuration": 0,
+  "executionDuration": 2510
+}
+[2026-01-22T02:24:47.113Z] +10987ms INFO  CLEANUP         Benchmark runner completed successfully
+[2026-01-22T02:24:47.115Z] +10989ms INFO  BENCHMARK       Benchmark execution completed: 4-cores-1k-jobs-memory
+{
+  "benchmarkIndex": 2,
+  "totalBenchmarks": 36,
+  "configName": "4-cores-1k-jobs-memory",
+  "processId": 41456,
+  "memoryUsage": {
+    "rss": 63504384,
+    "heapTotal": 9206784,
+    "heapUsed": 9932119,
+    "external": 2725415,
+    "arrayBuffers": 120
+  },
+  "resultSummary": {
+    "totalTime": 2535,
+    "jobsPerSecond": 394.4773175542406
+  }
+}
+[2026-01-22T02:24:47.117Z] +10991ms INFO  RESULT          Benchmark 4-cores-1k-jobs-memory completed
+{
+  "totalTime": 2535,
+  "jobsPerSecond": 394.4773175542406,
+  "queueingDuration": 0,
+  "executionDuration": 2510
+}
+[2026-01-22T02:24:47.118Z] +10992ms INFO  BENCHMARK       Waiting 1 second for cleanup to complete
+[2026-01-22T02:24:48.121Z] +11995ms INFO  BENCHMARK       Completed benchmark 2/36, cooling down before next benchmark
+{
+  "completedBenchmark": "4-cores-1k-jobs-memory",
+  "nextBenchmark": "6-cores-1k-jobs-memory",
+  "processId": 41456,
+  "memoryUsage": {
+    "rss": 63504384,
+    "heapTotal": 9042944,
+    "heapUsed": 9933431,
+    "external": 2725463,
+    "arrayBuffers": 120
+  }
+}
+[2026-01-22T02:24:50.123Z] +13997ms INFO  BENCHMARK       Starting benchmark 3/36
+{
+  "nextBenchmark": "6-cores-1k-jobs-memory",
+  "processId": 41456,
+  "memoryUsage": {
+    "rss": 63406080,
+    "heapTotal": 9042944,
+    "heapUsed": 9933674,
+    "external": 2725466,
+    "arrayBuffers": 120
+  }
+}
+[2026-01-22T02:24:50.123Z] +13997ms INFO  BENCHMARK       About to start benchmark execution: 6-cores-1k-jobs-memory
+{
+  "benchmarkIndex": 3,
+  "totalBenchmarks": 36,
+  "configName": "6-cores-1k-jobs-memory",
+  "processId": 41456,
+  "memoryUsage": {
+    "rss": 63406080,
+    "heapTotal": 9042944,
+    "heapUsed": 9933674,
+    "external": 2725466,
+    "arrayBuffers": 120
+  }
+}
+[2026-01-22T02:24:50.125Z] +13999ms INFO  BENCHMARK       Starting benchmark: 6-cores-1k-jobs-memory
+{
+  "cores": 6,
+  "totalJobs": 1000,
+  "backend": "memory",
+  "taskTypes": [
+    {
+      "name": "light",
+      "cpuCycles": 1000,
+      "weight": 0.3
+    },
+    {
+      "name": "medium",
+      "cpuCycles": 10000,
+      "weight": 0.4
+    },
+    {
+      "name": "heavy",
+      "cpuCycles": 50000,
+      "weight": 0.2
+    },
+    {
+      "name": "intensive",
+      "cpuCycles": 100000,
+      "weight": 0.1
+    }
+  ]
+}
+[2026-01-22T02:24:50.126Z] +14000ms INFO  SETUP           Initializing task manager
+{
+  "maxThreads": 6,
+  "backend": "memory"
+}
+[2026-01-22T02:24:50.130Z] +14005ms INFO  SETUP           TaskManager initialized successfully
+[2026-01-22T02:24:50.132Z] +14006ms DEBUG JOBS            Task types after difficulty scaling
+{
+  "original": [
+    {
+      "name": "light",
+      "cpuCycles": 1000,
+      "weight": 0.3
+    },
+    {
+      "name": "medium",
+      "cpuCycles": 10000,
+      "weight": 0.4
+    },
+    {
+      "name": "heavy",
+      "cpuCycles": 50000,
+      "weight": 0.2
+    },
+    {
+      "name": "intensive",
+      "cpuCycles": 100000,
+      "weight": 0.1
+    }
+  ],
+  "scaled": [
+    {
+      "name": "light",
+      "cpuCycles": 1000,
+      "weight": 0.3
+    },
+    {
+      "name": "medium",
+      "cpuCycles": 10000,
+      "weight": 0.4
+    },
+    {
+      "name": "heavy",
+      "cpuCycles": 50000,
+      "weight": 0.2
+    },
+    {
+      "name": "intensive",
+      "cpuCycles": 100000,
+      "weight": 0.1
+    }
+  ]
+}
+[2026-01-22T02:24:50.133Z] +14007ms INFO  SETUP           Generated 1000 job payloads
+[2026-01-22T02:24:50.134Z] +14008ms INFO  PHASE           Starting execution phase
+{
+  "cores": 6,
+  "totalJobs": 1000
+}
+[2026-01-22T02:24:51.824Z] +15698ms DEBUG SYSTEM          System performance stats
+{
+  "phase": "queueing",
+  "duration": 1689,
+  "peakCPU": 25.007198962480572,
+  "peakMemory": 68222976,
+  "averageCPU": 25.00713357077043,
+  "averageMemory": 65969694.11764706
+}
+[2026-01-22T02:24:51.824Z] +15698ms INFO  PHASE           Completed execution phase in 1689ms
+[2026-01-22T02:24:51.826Z] +15700ms INFO  CLEANUP         Cleaning up worker event listeners
+[2026-01-22T02:24:51.827Z] +15701ms INFO  CLEANUP         Worker event listeners cleaned up
+[2026-01-22T02:24:51.828Z] +15702ms INFO  CLEANUP         Shutting down task manager
+[2026-01-22T02:24:51.935Z] +15809ms INFO  CLEANUP         Task manager shutdown completed
+[2026-01-22T02:24:51.935Z] +15809ms INFO  CLEANUP         Cleaning up queue state file
+[2026-01-22T02:24:51.939Z] +15813ms INFO  CLEANUP         Queue state file cleaned up
+[2026-01-22T02:24:51.941Z] +15815ms INFO  CLEANUP         Creating benchmark result
+[2026-01-22T02:24:51.942Z] +15816ms INFO  CLEANUP         Logging benchmark completion
+[2026-01-22T02:24:51.943Z] +15817ms INFO  BENCHMARK       Completed benchmark: 6-cores-1k-jobs-memory
+{
+  "totalTime": 1700,
+  "jobsPerSecond": 588.2352941176471,
+  "queueingDuration": 0,
+  "executionDuration": 1689
+}
+[2026-01-22T02:24:51.944Z] +15818ms INFO  CLEANUP         Benchmark runner completed successfully
+[2026-01-22T02:24:51.946Z] +15820ms INFO  BENCHMARK       Benchmark execution completed: 6-cores-1k-jobs-memory
+{
+  "benchmarkIndex": 3,
+  "totalBenchmarks": 36,
+  "configName": "6-cores-1k-jobs-memory",
+  "processId": 41456,
+  "memoryUsage": {
+    "rss": 69222400,
+    "heapTotal": 10912768,
+    "heapUsed": 11575600,
+    "external": 2829376,
+    "arrayBuffers": 120
+  },
+  "resultSummary": {
+    "totalTime": 1700,
+    "jobsPerSecond": 588.2352941176471
+  }
+}
+[2026-01-22T02:24:51.947Z] +15821ms INFO  RESULT          Benchmark 6-cores-1k-jobs-memory completed
+{
+  "totalTime": 1700,
+  "jobsPerSecond": 588.2352941176471,
+  "queueingDuration": 0,
+  "executionDuration": 1689
+}
+[2026-01-22T02:24:51.948Z] +15822ms INFO  BENCHMARK       Waiting 1 second for cleanup to complete
+[2026-01-22T02:24:52.951Z] +16825ms INFO  BENCHMARK       Completed benchmark 3/36, cooling down before next benchmark
+{
+  "completedBenchmark": "6-cores-1k-jobs-memory",
+  "nextBenchmark": "2-cores-10k-jobs-memory",
+  "processId": 41456,
+  "memoryUsage": {
+    "rss": 69255168,
+    "heapTotal": 10765312,
+    "heapUsed": 11579320,
+    "external": 2831704,
+    "arrayBuffers": 120
+  }
+}
+[2026-01-22T02:24:54.951Z] +18825ms INFO  BENCHMARK       Starting benchmark 4/36
+{
+  "nextBenchmark": "2-cores-10k-jobs-memory",
+  "processId": 41456,
+  "memoryUsage": {
+    "rss": 69271552,
+    "heapTotal": 10765312,
+    "heapUsed": 11579563,
+    "external": 2831707,
+    "arrayBuffers": 120
+  }
+}
+[2026-01-22T02:24:54.952Z] +18826ms INFO  BENCHMARK       About to start benchmark execution: 2-cores-10k-jobs-memory
+{
+  "benchmarkIndex": 4,
+  "totalBenchmarks": 36,
+  "configName": "2-cores-10k-jobs-memory",
+  "processId": 41456,
+  "memoryUsage": {
+    "rss": 69271552,
+    "heapTotal": 10765312,
+    "heapUsed": 11579563,
+    "external": 2831707,
+    "arrayBuffers": 120
+  }
+}
+[2026-01-22T02:24:54.954Z] +18828ms INFO  BENCHMARK       Starting benchmark: 2-cores-10k-jobs-memory
+{
+  "cores": 2,
+  "totalJobs": 10000,
+  "backend": "memory",
+  "taskTypes": [
+    {
+      "name": "light",
+      "cpuCycles": 1000,
+      "weight": 0.3
+    },
+    {
+      "name": "medium",
+      "cpuCycles": 10000,
+      "weight": 0.4
+    },
+    {
+      "name": "heavy",
+      "cpuCycles": 50000,
+      "weight": 0.2
+    },
+    {
+      "name": "intensive",
+      "cpuCycles": 100000,
+      "weight": 0.1
+    }
+  ]
+}
+[2026-01-22T02:24:54.955Z] +18829ms INFO  SETUP           Initializing task manager
+{
+  "maxThreads": 2,
+  "backend": "memory"
+}
+[2026-01-22T02:24:54.961Z] +18836ms INFO  SETUP           TaskManager initialized successfully
+[2026-01-22T02:24:54.962Z] +18836ms DEBUG JOBS            Task types after difficulty scaling
+{
+  "original": [
+    {
+      "name": "light",
+      "cpuCycles": 1000,
+      "weight": 0.3
+    },
+    {
+      "name": "medium",
+      "cpuCycles": 10000,
+      "weight": 0.4
+    },
+    {
+      "name": "heavy",
+      "cpuCycles": 50000,
+      "weight": 0.2
+    },
+    {
+      "name": "intensive",
+      "cpuCycles": 100000,
+      "weight": 0.1
+    }
+  ],
+  "scaled": [
+    {
+      "name": "light",
+      "cpuCycles": 1000,
+      "weight": 0.3
+    },
+    {
+      "name": "medium",
+      "cpuCycles": 10000,
+      "weight": 0.4
+    },
+    {
+      "name": "heavy",
+      "cpuCycles": 50000,
+      "weight": 0.2
+    },
+    {
+      "name": "intensive",
+      "cpuCycles": 100000,
+      "weight": 0.1
+    }
+  ]
+}
+[2026-01-22T02:24:54.964Z] +18838ms INFO  SETUP           Generated 10000 job payloads
+[2026-01-22T02:24:54.964Z] +18838ms INFO  PHASE           Starting execution phase
+{
+  "cores": 2,
+  "totalJobs": 10000
+}
