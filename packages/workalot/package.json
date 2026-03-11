@@ -1,6 +1,6 @@
 {
   "name": "@alcyone-labs/workalot",
-  "version": "2.0.0-alpha",
+  "version": "2.0.0",
   "description": "High-performance, multi-threaded job queue system for NodeJS/BunJS. Achieve high throughput jobs/sec with linear worker scaling.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

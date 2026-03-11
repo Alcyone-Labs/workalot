@@ -1,6 +1,6 @@
 {
   "name": "@alcyone-labs/workalot-telemetry",
-  "version": "2.0.0-alpha",
+  "version": "2.0.0",
   "description": "OpenTelemetry-based telemetry and metrics for Workalot job queue",
   "type": "module",
   "main": "dist/index.js",

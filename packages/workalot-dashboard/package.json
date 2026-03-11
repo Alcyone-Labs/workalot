@@ -1,6 +1,6 @@
 {
   "name": "@alcyone-labs/workalot-dashboard",
-  "version": "2.0.0-alpha",
+  "version": "2.0.0",
   "description": "Web-based dashboard and control plane for Workalot job queue",
   "type": "module",
   "main": "dist/index.js",
